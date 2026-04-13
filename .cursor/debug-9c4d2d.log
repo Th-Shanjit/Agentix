@@ -1,0 +1,2 @@
+{"sessionId":"9c4d2d","hypothesisId":"H1","location":"board/page.tsx:beforeFindMany","message":"BoardPage entering userJob.findMany","data":{"hasUserId":true},"timestamp":1776121526271}
+{"sessionId":"9c4d2d","hypothesisId":"H1","location":"board/page.tsx:afterFindMany","message":"userJob.findMany ok","data":{"rowCount":0},"timestamp":1776121530016}
