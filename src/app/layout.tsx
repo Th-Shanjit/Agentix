@@ -4,6 +4,7 @@ import "./globals.css";
 import { auth } from "@/auth";
 import { Providers } from "@/components/providers/Providers";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -31,6 +32,7 @@ export default async function RootLayout({
       <body className={`${inter.variable} touch-manipulation font-sans antialiased`}>
         <Providers session={session}>{children}</Providers>
         <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );
