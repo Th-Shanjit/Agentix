@@ -1,6 +1,12 @@
 "use client";
 
-import { ExternalLink, Building2, CalendarDays } from "lucide-react";
+import {
+  ExternalLink,
+  Building2,
+  CalendarDays,
+  Sparkles,
+  Target,
+} from "lucide-react";
 import { IOSToggle } from "@/components/ui/IOSToggle";
 import type { JobDTO } from "@/lib/jobs";
 import { cn } from "@/lib/cn";
@@ -8,7 +14,10 @@ import { cn } from "@/lib/cn";
 type JobCardProps = {
   job: JobDTO;
   busy: boolean;
+  aiBusy: boolean;
   onAppliedChange: (id: string, applied: boolean) => void;
+  onEstimateCtc: (job: JobDTO) => void;
+  onMatchResume: (job: JobDTO) => void;
 };
 
 function formatDiscovered(iso: string) {
@@ -24,7 +33,14 @@ function formatDiscovered(iso: string) {
   }
 }
 
-export function JobCard({ job, busy, onAppliedChange }: JobCardProps) {
+export function JobCard({
+  job,
+  busy,
+  aiBusy,
+  onAppliedChange,
+  onEstimateCtc,
+  onMatchResume,
+}: JobCardProps) {
   return (
     <article
       className={cn(
@@ -53,15 +69,41 @@ export function JobCard({ job, busy, onAppliedChange }: JobCardProps) {
           {job.ctc && (
             <p className="text-sm font-medium text-violet-800/90">CTC: {job.ctc}</p>
           )}
-          <a
-            href={job.link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex w-fit items-center gap-1.5 rounded-full border border-white/60 bg-white/45 px-3 py-1.5 text-xs font-semibold text-violet-700 shadow-sm backdrop-blur-xl transition-all duration-300 hover:border-violet-300/60 hover:bg-white/65"
-          >
-            Open posting
-            <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.75} />
-          </a>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <button
+              type="button"
+              disabled={aiBusy}
+              onClick={() => onEstimateCtc(job)}
+              className={cn(
+                "inline-flex min-h-[44px] min-w-0 items-center gap-1.5 rounded-full border border-white/60 bg-white/45 px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm backdrop-blur-xl transition-all duration-300 sm:min-h-0 sm:py-1.5 active:scale-[0.99]",
+                "hover:border-violet-300/60 hover:bg-white/65 disabled:cursor-not-allowed disabled:opacity-50"
+              )}
+            >
+              <Sparkles className="h-3.5 w-3.5 text-violet-700" strokeWidth={1.75} />
+              Estimate CTC
+            </button>
+            <button
+              type="button"
+              disabled={aiBusy}
+              onClick={() => onMatchResume(job)}
+              className={cn(
+                "inline-flex min-h-[44px] min-w-0 items-center gap-1.5 rounded-full border border-white/60 bg-white/45 px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm backdrop-blur-xl transition-all duration-300 sm:min-h-0 sm:py-1.5 active:scale-[0.99]",
+                "hover:border-emerald-300/60 hover:bg-white/65 disabled:cursor-not-allowed disabled:opacity-50"
+              )}
+            >
+              <Target className="h-3.5 w-3.5 text-emerald-700" strokeWidth={1.75} />
+              Match resume
+            </button>
+            <a
+              href={job.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-[44px] min-w-0 items-center gap-1.5 rounded-full border border-white/60 bg-white/45 px-3 py-2 text-xs font-semibold text-violet-700 shadow-sm backdrop-blur-xl transition-all duration-300 sm:min-h-0 sm:py-1.5 active:scale-[0.99] hover:border-violet-300/60 hover:bg-white/65"
+            >
+              Open posting
+              <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.75} />
+            </a>
+          </div>
         </div>
 
         <div className="flex shrink-0 items-center justify-between gap-3 rounded-2xl border border-white/50 bg-white/30 px-4 py-3 backdrop-blur-xl sm:flex-col sm:items-end sm:py-4">

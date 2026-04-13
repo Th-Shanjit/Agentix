@@ -14,7 +14,7 @@ export function AppShell({ children }: AppShellProps) {
       <div className="relative z-10 flex min-h-dvh">
         <DesktopSidebar />
         <div className="flex min-h-dvh flex-1 flex-col">
-          <main className="flex-1 px-4 pb-24 pt-6 md:px-8 md:pb-10 md:pt-8">
+          <main className="flex-1 px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))] pt-[max(1.5rem,env(safe-area-inset-top,0px))] md:px-8 md:pb-10 md:pt-8">
             <div className="mx-auto w-full max-w-5xl">{children}</div>
           </main>
         </div>

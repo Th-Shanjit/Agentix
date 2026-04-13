@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { SignOutButton } from "@/components/auth/SignOutButton";
+import { ResumeUpload } from "@/components/profile/ResumeUpload";
 
 export default async function ProfilePage() {
   const session = await auth();
@@ -11,8 +12,9 @@ export default async function ProfilePage() {
           Profile & resume
         </h2>
         <p className="mt-2 max-w-2xl text-sm text-slate-600">
-          Client-side PDF parsing with pdfjs-dist will live here. Text stays in
-          the browser only.
+          Upload a PDF below: text is extracted with pdfjs-dist in your browser
+          only and stored as plain text in this device&apos;s local storage for
+          ATS match (next step). The PDF file is never sent to our servers.
         </p>
         {session?.user && (
           <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-white/50 pt-4 text-sm text-slate-700">
@@ -31,6 +33,8 @@ export default async function ProfilePage() {
           </div>
         )}
       </header>
+
+      <ResumeUpload />
     </div>
   );
 }
