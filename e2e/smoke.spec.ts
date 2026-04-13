@@ -16,8 +16,20 @@ test.describe("deploy smoke: routes and auth boundaries", () => {
     await expect(page).toHaveURL(/\/login/);
   });
 
+  test("search redirects unauthenticated users to login", async ({ page }) => {
+    await page.goto("/search", gotoOpts);
+    await expect(page).toHaveURL(/\/login/);
+  });
+
   test("GET /api/jobs returns 401 without session", async ({ request }) => {
     const res = await request.get("/api/jobs");
+    expect(res.status()).toBe(401);
+  });
+
+  test("GET /api/search/jobs returns 401 without session", async ({
+    request,
+  }) => {
+    const res = await request.get("/api/search/jobs");
     expect(res.status()).toBe(401);
   });
 

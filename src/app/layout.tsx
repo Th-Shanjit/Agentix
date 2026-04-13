@@ -16,9 +16,9 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Agentix — Job search",
+  title: "Agentix — Jobs & search",
   description:
-    "Track jobs, save résumé text, and get AI help with applications and ATS-style matching.",
+    "Save roles, search listings, store résumé text, and use AI for matching.",
 };
 
 export default async function RootLayout({

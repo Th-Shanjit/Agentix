@@ -473,8 +473,8 @@ export function JobBoard({ initialJobs, userId }: JobBoardProps) {
             Your pipeline is empty
           </h3>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-600">
-            Add roles you care about manually, push them from your own tools via
-            the API, or let tracker webhooks drop new postings here automatically.
+            Add a job, use Search for the catalog, or send jobs in via the API /
+            webhook.
           </p>
           <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             {userId ? (

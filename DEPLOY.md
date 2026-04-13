@@ -15,7 +15,9 @@ Set these in your host’s **Environment Variables** UI (e.g. Vercel → Project
 | `AUTH_URL` | Yes in prod | Full public origin, **no trailing slash**, e.g. `https://your-app.vercel.app`. Wrong value breaks OAuth callbacks and session cookies. |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | If using Google sign-in | See [Google OAuth](#google-oauth) below. |
 | `GEMINI_API_KEY` | For AI features | Server-only; never expose to the client. |
-| `CRON_WEBHOOK_SECRET` | If using the cron webhook | Long random string; your GitHub Action sends it as `x-agentix-secret` or `Authorization: Bearer …`. |
+| `CRON_WEBHOOK_SECRET` | If using webhooks | Long random string; GitHub Actions send it as `x-agentix-secret` or `Authorization: Bearer …`. |
+| `RAPIDAPI_KEY` | For JSearch catalog ingest | RapidAPI key for [JSearch](https://rapidapi.com/letscrape-6bRBa3QguO5/api/jsearch); used by `POST /api/webhooks/ingest-jobs`. |
+| `DEFAULT_INGEST_QUERY` | Optional | Fallback `query` string when the ingest body does not include one. |
 | `EMAIL_SERVER` / `EMAIL_FROM` | Optional | Magic-link email via Nodemailer. |
 
 Local-only copies belong in **`.env.local`** (gitignored). For Prisma CLI, `npm run db:*` loads `.env.local` via `dotenv-cli`; raw `npx prisma` only auto-loads `.env`.
@@ -28,7 +30,9 @@ Local-only copies belong in **`.env.local`** (gitignored). For Prisma CLI, `npm 
    - **Quick path:** `dotenv -e .env.production.local -- npx prisma db push` from a trusted machine with prod env, **or** run the same against prod URL in CI with secrets.
    - **Stricter path:** use `prisma migrate` for versioned migrations once you’re ready.
 
-The app expects tables that match [`prisma/schema.prisma`](./prisma/schema.prisma) (including Auth.js adapter tables).
+The app expects tables that match [`prisma/schema.prisma`](./prisma/schema.prisma) (including Auth.js adapter tables). After pulling new versions, run `npm run db:push` so new columns (search, job enrichment, ingest metadata) exist.
+
+**AI disclaimers:** salary bands, “Glassdoor-like” copy, and forum sentiment on the job detail page are **model-generated summaries**, not live scraped ratings. Treat them as hints; verify on official sites before decisions.
 
 ## 3. Google OAuth
 
@@ -56,9 +60,21 @@ Headers: `x-agentix-secret: <CRON_WEBHOOK_SECRET>` **or** `Authorization: Bearer
 
 If `CRON_WEBHOOK_SECRET` is unset, the route returns **503** (disabled). There is a **maximum batch size** per request (see `MAX_JOBS_PER_REQUEST` in the route) to limit abuse.
 
+### Catalog ingest (JSearch)
+
+`POST /api/webhooks/ingest-jobs` uses the **same** secret headers as the cron route. Optional JSON body:
+
+```json
+{ "query": "software engineer remote", "page": 1 }
+```
+
+Requires **`RAPIDAPI_KEY`** (RapidAPI JSearch). Jobs are deduped by URL and appear under **Search** and can be saved to **My jobs**. If the body omits `query`, `DEFAULT_INGEST_QUERY` is used when set.
+
+The repo includes [`.github/workflows/ingest-jobs.yml`](./.github/workflows/ingest-jobs.yml) (optional): set repository secrets `CRON_WEBHOOK_SECRET`, `INGEST_URL` (e.g. `https://your-app.vercel.app/api/webhooks/ingest-jobs`), and optionally `INGEST_JSON` for the POST body.
+
 ## 5. Security behavior (what the app does)
 
-- **Middleware** protects `/board`, `/profile`, `/trackers`, and authenticated `/api/jobs`, `/api/trackers`, `/api/user/*` — unauthenticated users get **401** on those APIs or redirect to `/login` for pages.
+- **Middleware** protects `/board`, `/search`, `/jobs`, `/profile`, `/trackers`, and authenticated `/api/jobs`, `/api/search`, `/api/trackers`, `/api/user/*` — unauthenticated users get **401** on those APIs or redirect to `/login` for pages.
 - **HTTP security headers** are set in [`next.config.mjs`](./next.config.mjs) (frame options, MIME sniffing, referrer policy, etc.).
 - **Gemini** runs only in server actions; the API key is not sent to the browser.
 

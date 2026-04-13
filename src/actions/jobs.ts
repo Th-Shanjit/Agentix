@@ -53,6 +53,7 @@ export async function addManualJob(data: {
         sourceUrl: canonical,
         dedupeKey,
         ctc: null,
+        ctcSource: "MANUAL",
         source: "Manual",
         postedAt: new Date(),
       },
@@ -91,6 +92,57 @@ export async function addManualJob(data: {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Could not add job.";
     return { ok: false, error: msg };
+  }
+}
+
+/** Add an existing catalog listing to the signed-in user’s list (saved). */
+export async function saveJobToMyList(jobListingId: string) {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) {
+    return { ok: false as const, error: "Unauthorized." };
+  }
+
+  if (!jobListingId.trim()) {
+    return { ok: false as const, error: "Missing job id." };
+  }
+
+  try {
+    const exists = await prisma.jobListing.findFirst({
+      where: { id: jobListingId, ingestionStatus: "VALIDATED" },
+    });
+    if (!exists) {
+      return { ok: false as const, error: "Job not found." };
+    }
+
+    await prisma.userJob.upsert({
+      where: {
+        userId_jobListingId: { userId, jobListingId },
+      },
+      create: {
+        userId,
+        jobListingId,
+        applied: false,
+        saved: true,
+      },
+      update: { saved: true },
+    });
+
+    const uj = await prisma.userJob.findUnique({
+      where: {
+        userId_jobListingId: { userId, jobListingId },
+      },
+      include: { jobListing: true },
+    });
+
+    if (!uj) {
+      return { ok: false as const, error: "Could not save." };
+    }
+
+    return { ok: true as const, job: toJobDTOFromJoin(uj) };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Could not save job.";
+    return { ok: false as const, error: msg };
   }
 }
 

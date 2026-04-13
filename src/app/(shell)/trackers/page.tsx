@@ -20,13 +20,9 @@ export default async function TrackersPage() {
           Job sources
         </h2>
         <p className="mt-2 max-w-2xl text-sm text-slate-600">
-          Company career pages your automation watches. When your cron hits the
-          webhook, new roles can appear under{" "}
-          <strong>My jobs</strong> with source{" "}
-          <code className="rounded-md bg-white/50 px-1.5 py-0.5 text-xs">
-            Tracker
-          </code>
-          .
+          URLs you care about (for your own scripts). Ingested jobs use the
+          webhook; they show up under <strong>My jobs</strong> or{" "}
+          <strong>Search</strong>.
         </p>
       </header>
       <TrackersPanel initialTrackers={initialTrackers} />

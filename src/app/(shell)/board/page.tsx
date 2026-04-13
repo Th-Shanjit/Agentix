@@ -24,8 +24,8 @@ export default async function BoardPage() {
           My jobs
         </h2>
         <p className="mt-2 max-w-2xl text-sm text-slate-600">
-          Roles you&apos;re tracking. The <strong>Applied</strong> toggle saves
-          instantly, then syncs to your account.
+          Your list. Tap a title for details. Toggle <strong>Applied</strong>{" "}
+          when you send an application.
         </p>
       </header>
 

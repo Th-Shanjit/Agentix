@@ -10,20 +10,40 @@ datasource db {
   url      = env("POSTGRES_PRISMA_URL")
 }
 
+enum RemotePreference {
+  ANY
+  REMOTE_ONLY
+  HYBRID
+  ONSITE
+}
+
+enum CtcSource {
+  API
+  INFERRED
+  MANUAL
+}
+
+enum IngestionStatus {
+  VALIDATED
+  REJECTED
+}
+
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  resumeText    String?   @db.Text
-  createdAt     DateTime  @default(now())
-  accounts      Account[]
-  sessions      Session[]
-  userJobs      UserJob[]
-  trackers      Tracker[]
-  /// Legacy per-user jobs — remove after `npx tsx scripts/migrate-legacy-job.mts`
-  legacyJobs    Job[]     @relation("LegacyJob")
+  id                     String            @id @default(cuid())
+  name                   String?
+  email                  String?           @unique
+  emailVerified          DateTime?
+  image                  String?
+  resumeText             String?           @db.Text
+  yearsExperience        Int?
+  preferredCountries     Json?
+  searchRemotePreference RemotePreference? @default(ANY)
+  createdAt              DateTime          @default(now())
+  accounts               Account[]
+  sessions               Session[]
+  userJobs               UserJob[]
+  trackers               Tracker[]
+  matchCaches            JobMatchCache[]
 
   @@index([email])
 }
@@ -68,21 +88,41 @@ model VerificationToken {
 
 /// Shared job posting (global catalog). Per-user state lives on `UserJob`.
 model JobListing {
-  id          String   @id @default(cuid())
-  title       String
-  company     String
-  location    String?
-  sourceUrl   String   @unique
-  dedupeKey   String   @unique
-  ctc         String?
-  source      String
-  postedAt    DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                   String          @id @default(cuid())
+  title                String
+  company              String
+  location             String?
+  sourceUrl            String          @unique
+  dedupeKey            String          @unique
+  ctc                  String?
+  ctcSource            CtcSource       @default(MANUAL)
+  salaryMin            Int?
+  salaryMax            Int?
+  salaryCurrency       String?         @default("USD")
+  source               String
+  sourceName           String?
+  externalId           String?
+  description          String?         @db.Text
+  employmentType       String?
+  remotePolicy         String?
+  countryCodes         Json?
+  experienceYearsMin   Int?
+  experienceYearsMax   Int?
+  careersUrl           String?
+  postedAt             DateTime        @default(now())
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  ingestionStatus    IngestionStatus @default(VALIDATED)
+  rejectionReason      String?
+  rawPayload           Json?
 
-  userJobs UserJob[]
+  userJobs     UserJob[]
+  matchCaches  JobMatchCache[]
+  enrichment   JobEnrichment?
 
   @@index([postedAt])
+  @@index([company])
+  @@index([title])
 }
 
 model UserJob {
@@ -100,21 +140,35 @@ model UserJob {
   @@index([userId])
 }
 
-/// @deprecated Run `npx tsx scripts/migrate-legacy-job.mts` then remove this model.
-model Job {
+/// Cached AI match scores for search (per user + listing).
+model JobMatchCache {
   id             String   @id @default(cuid())
   userId         String
-  user           User     @relation("LegacyJob", fields: [userId], references: [id], onDelete: Cascade)
-  company        String
-  role           String
-  dateDiscovered DateTime @default(now())
-  ctc            String?
-  link           String
-  applied        Boolean  @default(false)
-  source         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobListingId   String
+  jobListing     JobListing @relation(fields: [jobListingId], references: [id], onDelete: Cascade)
+  relevanceScore Float
+  fitScore       Float
+  upsideScore    Float
+  strengths      Json
+  weaknesses     Json
+  updatedAt      DateTime @updatedAt
 
+  @@unique([userId, jobListingId])
   @@index([userId])
-  @@index([dateDiscovered])
+}
+
+/// Cached enrichment for job detail (ratings summary, CTC bands, resume analysis).
+model JobEnrichment {
+  id             String     @id @default(cuid())
+  jobListingId   String     @unique
+  jobListing     JobListing @relation(fields: [jobListingId], references: [id], onDelete: Cascade)
+  ctcBands       Json?
+  ratingsWeb     Json?
+  forumSentiment Json?
+  resumeAnalysis Json?
+  fiveToneResumes Json?
+  updatedAt      DateTime   @updatedAt
 }
 
 model Tracker {

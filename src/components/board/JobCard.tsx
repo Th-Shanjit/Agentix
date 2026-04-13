@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   ExternalLink,
   Building2,
@@ -59,7 +60,12 @@ export function JobCard({
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-lg font-semibold leading-snug text-slate-900">
-              {job.role}
+              <Link
+                href={`/jobs/${job.id}`}
+                className="hover:text-violet-800 hover:underline"
+              >
+                {job.role}
+              </Link>
             </h3>
             <span className="rounded-full border border-white/60 bg-white/35 px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-600 backdrop-blur-md">
               {job.source}

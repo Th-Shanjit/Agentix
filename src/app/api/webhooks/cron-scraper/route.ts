@@ -12,6 +12,13 @@ type IncomingJob = {
   role: string;
   link: string;
   ctc?: string | null;
+  description?: string | null;
+  location?: string | null;
+  sourceName?: string | null;
+  salaryMin?: number | null;
+  salaryMax?: number | null;
+  salaryCurrency?: string | null;
+  remotePolicy?: string | null;
 };
 
 function getSecret(request: Request) {
@@ -97,7 +104,37 @@ export async function POST(request: Request) {
         : typeof j.ctc === "string"
           ? j.ctc.trim() || null
           : null;
-    jobs.push({ company, role, link, ctc });
+    const description =
+      typeof j.description === "string" ? j.description.trim() || null : null;
+    const location =
+      typeof j.location === "string" ? j.location.trim() || null : null;
+    const sourceName =
+      typeof j.sourceName === "string" ? j.sourceName.trim() || null : null;
+    const salaryMin =
+      typeof j.salaryMin === "number" && Number.isFinite(j.salaryMin)
+        ? Math.round(j.salaryMin)
+        : null;
+    const salaryMax =
+      typeof j.salaryMax === "number" && Number.isFinite(j.salaryMax)
+        ? Math.round(j.salaryMax)
+        : null;
+    const salaryCurrency =
+      typeof j.salaryCurrency === "string" ? j.salaryCurrency.trim() : null;
+    const remotePolicy =
+      typeof j.remotePolicy === "string" ? j.remotePolicy.trim() || null : null;
+    jobs.push({
+      company,
+      role,
+      link,
+      ctc,
+      description,
+      location,
+      sourceName,
+      salaryMin,
+      salaryMax,
+      salaryCurrency,
+      remotePolicy,
+    });
   }
 
   if (jobs.length === 0) {
@@ -119,7 +156,15 @@ export async function POST(request: Request) {
         sourceUrl: canonical,
         dedupeKey,
         ctc: j.ctc,
+        ctcSource: j.ctc ? "MANUAL" : "MANUAL",
         source: "Tracker",
+        sourceName: j.sourceName ?? undefined,
+        description: j.description ?? undefined,
+        location: j.location ?? undefined,
+        salaryMin: j.salaryMin ?? undefined,
+        salaryMax: j.salaryMax ?? undefined,
+        salaryCurrency: j.salaryCurrency ?? undefined,
+        remotePolicy: j.remotePolicy ?? undefined,
         postedAt: new Date(),
       },
       update: {
@@ -127,6 +172,13 @@ export async function POST(request: Request) {
         company: j.company,
         ctc: j.ctc ?? undefined,
         sourceUrl: canonical,
+        sourceName: j.sourceName ?? undefined,
+        description: j.description ?? undefined,
+        location: j.location ?? undefined,
+        salaryMin: j.salaryMin ?? undefined,
+        salaryMax: j.salaryMax ?? undefined,
+        salaryCurrency: j.salaryCurrency ?? undefined,
+        remotePolicy: j.remotePolicy ?? undefined,
       },
     });
 

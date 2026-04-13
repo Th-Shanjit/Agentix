@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { Briefcase, LogOut, Radar, UserRound } from "lucide-react";
+import { Briefcase, LogOut, Radar, Search, UserRound } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 const nav = [
   { href: "/board", label: "My jobs", icon: Briefcase },
+  { href: "/search", label: "Search", icon: Search },
   { href: "/trackers", label: "Sources", icon: Radar },
   { href: "/profile", label: "Profile", icon: UserRound },
 ];
@@ -27,9 +28,7 @@ export function DesktopSidebar() {
         <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
           Agentix
         </p>
-        <h1 className="mt-1 text-lg font-semibold text-slate-900">
-          Job search
-        </h1>
+        <h1 className="mt-1 text-lg font-semibold text-slate-900">Career hub</h1>
       </div>
       <nav className="flex flex-1 flex-col gap-1">
         {nav.map(({ href, label, icon: Icon }) => {

@@ -48,8 +48,7 @@ function LoginForm({ googleEnabled, emailEnabled }: LoginClientProps) {
             Sign in
           </h1>
           <p className="mt-2 text-sm text-slate-600">
-            Google OAuth or email magic link. Sessions use JWT; data stays
-            scoped per user in the API.
+            Google or email link. Your data stays on your account.
           </p>
         </div>
 

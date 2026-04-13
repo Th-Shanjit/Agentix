@@ -23,6 +23,10 @@ export default auth((req) => {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (pathname.startsWith("/api/search")) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const login = new URL("/login", req.url);
   login.searchParams.set("callbackUrl", `${pathname}${req.nextUrl.search}`);
   return NextResponse.redirect(login);
@@ -31,10 +35,14 @@ export default auth((req) => {
 export const config = {
   matcher: [
     "/board/:path*",
+    "/search",
+    "/search/:path*",
+    "/jobs/:path*",
     "/trackers/:path*",
     "/profile/:path*",
     "/api/jobs/:path*",
     "/api/trackers/:path*",
     "/api/user/:path*",
+    "/api/search/:path*",
   ],
 };

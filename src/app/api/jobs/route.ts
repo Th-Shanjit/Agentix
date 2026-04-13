@@ -77,6 +77,7 @@ export async function POST(request: Request) {
       sourceUrl: canonical,
       dedupeKey,
       ctc,
+      ctcSource: "MANUAL",
       source,
       postedAt,
     },

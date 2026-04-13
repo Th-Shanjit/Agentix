@@ -1,6 +1,6 @@
 # Agentix
 
-Personal career pipeline: job board, résumé (PDF → text, stored per account), trackers + cron webhook, and Gemini-powered CTC / ATS-style match (server-side).
+Personal career pipeline: **My jobs** list, **Search** over a shared catalog, résumé upload, optional JSearch ingest + webhooks, and Gemini-powered matching and job detail enrichment (server-side).
 
 ## Quick start
 
