@@ -3,7 +3,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { auth } from "@/auth";
 
-const MODEL_FAST = "gemini-1.5-flash";
+const MODEL_FAST = "gemini-3-flash-preview";
 
 function getModel() {
   const key = process.env.GEMINI_API_KEY;
