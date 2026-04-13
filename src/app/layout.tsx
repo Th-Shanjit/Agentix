@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { auth } from "@/auth";
 import { Providers } from "@/components/providers/Providers";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -29,6 +30,7 @@ export default async function RootLayout({
     <html lang="en">
       <body className={`${inter.variable} touch-manipulation font-sans antialiased`}>
         <Providers session={session}>{children}</Providers>
+        <SpeedInsights />
       </body>
     </html>
   );
