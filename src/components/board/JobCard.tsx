@@ -1,0 +1,86 @@
+"use client";
+
+import { ExternalLink, Building2, CalendarDays } from "lucide-react";
+import { IOSToggle } from "@/components/ui/IOSToggle";
+import type { JobDTO } from "@/lib/jobs";
+import { cn } from "@/lib/cn";
+
+type JobCardProps = {
+  job: JobDTO;
+  busy: boolean;
+  onAppliedChange: (id: string, applied: boolean) => void;
+};
+
+function formatDiscovered(iso: string) {
+  try {
+    const d = new Date(iso);
+    return new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(d);
+  } catch {
+    return iso;
+  }
+}
+
+export function JobCard({ job, busy, onAppliedChange }: JobCardProps) {
+  return (
+    <article
+      className={cn(
+        "rounded-3xl border border-white/60 bg-white/40 p-5 shadow-glass backdrop-blur-2xl transition-all duration-300",
+        job.applied && "ring-1 ring-emerald-400/25"
+      )}
+    >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-lg font-semibold leading-snug text-slate-900">
+              {job.role}
+            </h3>
+            <span className="rounded-full border border-white/60 bg-white/35 px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-600 backdrop-blur-md">
+              {job.source}
+            </span>
+          </div>
+          <p className="flex items-center gap-2 text-sm text-slate-600">
+            <Building2 className="h-4 w-4 shrink-0 opacity-70" strokeWidth={1.75} />
+            {job.company}
+          </p>
+          <p className="flex items-center gap-2 text-xs text-slate-500">
+            <CalendarDays className="h-3.5 w-3.5 shrink-0 opacity-70" strokeWidth={1.75} />
+            Discovered {formatDiscovered(job.dateDiscovered)}
+          </p>
+          {job.ctc && (
+            <p className="text-sm font-medium text-violet-800/90">CTC: {job.ctc}</p>
+          )}
+          <a
+            href={job.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex w-fit items-center gap-1.5 rounded-full border border-white/60 bg-white/45 px-3 py-1.5 text-xs font-semibold text-violet-700 shadow-sm backdrop-blur-xl transition-all duration-300 hover:border-violet-300/60 hover:bg-white/65"
+          >
+            Open posting
+            <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.75} />
+          </a>
+        </div>
+
+        <div className="flex shrink-0 items-center justify-between gap-3 rounded-2xl border border-white/50 bg-white/30 px-4 py-3 backdrop-blur-xl sm:flex-col sm:items-end sm:py-4">
+          <div className="text-right sm:w-full">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+              Applied
+            </p>
+            <p className="mt-0.5 text-xs text-slate-600">
+              {job.applied ? "On your radar" : "Not yet"}
+            </p>
+          </div>
+          <IOSToggle
+            checked={job.applied}
+            disabled={busy}
+            aria-label={`Mark ${job.role} at ${job.company} as applied`}
+            onChange={(next) => onAppliedChange(job.id, next)}
+          />
+        </div>
+      </div>
+    </article>
+  );
+}
