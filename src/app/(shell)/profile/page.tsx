@@ -1,20 +1,29 @@
 import { auth } from "@/auth";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { ResumeUpload } from "@/components/profile/ResumeUpload";
+import { prisma } from "@/lib/prisma";
 
 export default async function ProfilePage() {
   const session = await auth();
+
+  let initialResumeText: string | null = null;
+  if (session?.user?.id) {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { resumeText: true },
+    });
+    initialResumeText = user?.resumeText ?? null;
+  }
 
   return (
     <div className="space-y-6">
       <header className="rounded-3xl border border-white/60 bg-white/40 p-6 shadow-glass backdrop-blur-2xl transition-all duration-300">
         <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
-          Profile & resume
+          Résumé
         </h2>
         <p className="mt-2 max-w-2xl text-sm text-slate-600">
-          Upload a PDF below: text is extracted with pdfjs-dist in your browser
-          only and stored as plain text in this device&apos;s local storage for
-          ATS match (next step). The PDF file is never sent to our servers.
+          Upload a PDF: text is read in your browser and saved to your account
+          for job matching and tips.
         </p>
         {session?.user && (
           <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-white/50 pt-4 text-sm text-slate-700">
@@ -34,7 +43,7 @@ export default async function ProfilePage() {
         )}
       </header>
 
-      <ResumeUpload />
+      <ResumeUpload initialResumeText={initialResumeText} />
     </div>
   );
 }

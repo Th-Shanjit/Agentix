@@ -6,8 +6,8 @@ import { Briefcase, Radar, UserRound } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 const nav = [
-  { href: "/board", label: "Board", icon: Briefcase },
-  { href: "/trackers", label: "Trackers", icon: Radar },
+  { href: "/board", label: "My jobs", icon: Briefcase },
+  { href: "/trackers", label: "Sources", icon: Radar },
   { href: "/profile", label: "Profile", icon: UserRound },
 ];
 

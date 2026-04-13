@@ -65,8 +65,8 @@ function LoginForm({ googleEnabled, emailEnabled }: LoginClientProps) {
               (and optional{" "}
               <code className="rounded bg-white/60 px-1">EMAIL_SERVER</code> /{" "}
               <code className="rounded bg-white/60 px-1">EMAIL_FROM</code>) in{" "}
-              <code className="rounded bg-white/60 px-1">.env</code>, then
-              restart the dev server.
+              <code className="rounded bg-white/60 px-1">.env.local</code>{" "}
+              (local) or your host env, then restart the dev server.
             </p>
           )}
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { IOSToggle } from "@/components/ui/IOSToggle";
 import { cn } from "@/lib/cn";
 
@@ -53,8 +54,12 @@ export function TrackersPanel({ initialTrackers }: TrackersPanelProps) {
         setCompany("");
         setUrl("");
         await refresh();
+        toast.success("Tracker added.");
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Could not add tracker.");
+        const msg =
+          e instanceof Error ? e.message : "Could not add tracker.";
+        setError(msg);
+        toast.error(msg);
       } finally {
         setBusy(false);
       }
@@ -76,6 +81,7 @@ export function TrackersPanel({ initialTrackers }: TrackersPanelProps) {
         await refresh();
       } catch {
         setError("Could not update tracker.");
+        toast.error("Could not update tracker.");
       } finally {
         setPendingId(null);
       }
@@ -91,8 +97,10 @@ export function TrackersPanel({ initialTrackers }: TrackersPanelProps) {
         const res = await fetch(`/api/trackers/${id}`, { method: "DELETE" });
         if (!res.ok) throw new Error();
         await refresh();
+        toast.success("Tracker removed.");
       } catch {
         setError("Could not delete tracker.");
+        toast.error("Could not delete tracker.");
       } finally {
         setPendingId(null);
       }
@@ -106,9 +114,9 @@ export function TrackersPanel({ initialTrackers }: TrackersPanelProps) {
         onSubmit={addTracker}
         className="rounded-3xl border border-white/60 bg-white/40 p-5 shadow-glass backdrop-blur-2xl transition-all duration-300 md:p-6"
       >
-        <p className="text-sm font-semibold text-slate-900">Add tracker</p>
+        <p className="text-sm font-semibold text-slate-900">Add a source</p>
         <p className="mt-1 text-xs text-slate-600">
-          Company career pages your GitHub Action will scrape into{" "}
+          Career site URLs your automation sends to{" "}
           <code className="rounded bg-white/50 px-1 py-0.5">/api/webhooks/cron-scraper</code>
           .
         </p>
@@ -152,11 +160,21 @@ export function TrackersPanel({ initialTrackers }: TrackersPanelProps) {
       </form>
 
       <section className="rounded-3xl border border-white/60 bg-white/35 p-5 shadow-glass backdrop-blur-2xl md:p-6">
-        <h3 className="text-sm font-semibold text-slate-900">Your trackers</h3>
+        <h3 className="text-sm font-semibold text-slate-900">Your sources</h3>
         {rows.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-600">
-            None yet — add a company URL above.
-          </p>
+          <div className="mt-4 rounded-2xl border border-dashed border-white/50 bg-white/20 p-6 text-center backdrop-blur-sm">
+            <p className="text-sm font-medium text-slate-800">
+              No trackers yet
+            </p>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              Add a company name and careers page URL above. When your cron hits
+              the webhook, new roles can land on the job board with source{" "}
+              <code className="rounded bg-white/50 px-1 py-0.5 text-xs">
+                Tracker
+              </code>
+              .
+            </p>
+          </div>
         ) : (
           <ul className="mt-4 space-y-3">
             {rows.map((t) => (

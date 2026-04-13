@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { canonicalJobUrl, jobDedupeKey } from "@/lib/job-url";
+import { toJobDTOFromJoin } from "@/lib/jobs";
 
 export async function GET() {
   const session = await auth();
@@ -9,12 +11,13 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const jobs = await prisma.job.findMany({
+  const rows = await prisma.userJob.findMany({
     where: { userId },
-    orderBy: { dateDiscovered: "desc" },
+    include: { jobListing: true },
+    orderBy: { jobListing: { postedAt: "desc" } },
   });
 
-  return NextResponse.json(jobs);
+  return NextResponse.json(rows.map((r) => toJobDTOFromJoin(r)));
 }
 
 export async function POST(request: Request) {
@@ -55,26 +58,60 @@ export async function POST(request: Request) {
     typeof data.ctc === "string" && data.ctc.trim() ? data.ctc.trim() : null;
   const applied = typeof data.applied === "boolean" ? data.applied : false;
 
-  let dateDiscovered = new Date();
+  let postedAt = new Date();
   if (typeof data.dateDiscovered === "string" && data.dateDiscovered) {
     const parsed = new Date(data.dateDiscovered);
     if (!Number.isNaN(parsed.getTime())) {
-      dateDiscovered = parsed;
+      postedAt = parsed;
     }
   }
 
-  const job = await prisma.job.create({
-    data: {
-      userId,
+  const canonical = canonicalJobUrl(link);
+  const dedupeKey = jobDedupeKey(link);
+
+  const listing = await prisma.jobListing.upsert({
+    where: { dedupeKey },
+    create: {
+      title: role,
       company,
-      role,
-      link,
+      sourceUrl: canonical,
+      dedupeKey,
       ctc,
-      applied,
       source,
-      dateDiscovered,
+      postedAt,
+    },
+    update: {
+      title: role,
+      company,
+      ctc,
+      source,
+      sourceUrl: canonical,
     },
   });
 
-  return NextResponse.json(job, { status: 201 });
+  await prisma.userJob.upsert({
+    where: {
+      userId_jobListingId: { userId, jobListingId: listing.id },
+    },
+    create: {
+      userId,
+      jobListingId: listing.id,
+      applied,
+      saved: true,
+    },
+    update: { applied },
+  });
+
+  const uj = await prisma.userJob.findUnique({
+    where: {
+      userId_jobListingId: { userId, jobListingId: listing.id },
+    },
+    include: { jobListing: true },
+  });
+
+  if (!uj) {
+    return NextResponse.json({ error: "Could not load job" }, { status: 500 });
+  }
+
+  return NextResponse.json(toJobDTOFromJoin(uj), { status: 201 });
 }

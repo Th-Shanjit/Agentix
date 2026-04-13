@@ -5,6 +5,111 @@ import { auth } from "@/auth";
 
 const MODEL_FAST = "gemini-3-flash-preview";
 
+/** Structured failure for UI: messaging, retry affordance, and analytics-friendly codes. */
+export type GeminiErrorCode =
+  | "unauthorized"
+  | "validation"
+  | "config"
+  | "model_empty"
+  | "parse_error"
+  | "rate_limit"
+  | "quota"
+  | "network"
+  | "unknown";
+
+export type GeminiError = {
+  code: GeminiErrorCode;
+  message: string;
+  retryable: boolean;
+};
+
+function geminiError(
+  code: GeminiErrorCode,
+  message: string,
+  retryable: boolean
+): GeminiError {
+  return { code, message, retryable };
+}
+
+function mapGeminiException(e: unknown, fallback: string): GeminiError {
+  const msg = e instanceof Error ? e.message : String(e);
+  const lower = msg.toLowerCase();
+
+  if (
+    lower.includes("gemini_api_key") ||
+    lower.includes("not configured") ||
+    (lower.includes("api key") && lower.includes("missing"))
+  ) {
+    return geminiError(
+      "config",
+      "Gemini is not configured on the server (set GEMINI_API_KEY).",
+      false
+    );
+  }
+
+  if (
+    lower.includes("429") ||
+    lower.includes("resource exhausted") ||
+    lower.includes("too many requests")
+  ) {
+    return geminiError(
+      "rate_limit",
+      "The model is rate-limited. Wait a moment and try again.",
+      true
+    );
+  }
+
+  if (
+    lower.includes("quota") ||
+    lower.includes("billing") ||
+    lower.includes("exceeded your") ||
+    lower.includes("limit exceeded")
+  ) {
+    return geminiError(
+      "quota",
+      "API quota or billing limit may be exceeded. Check Google AI Studio or Cloud billing.",
+      false
+    );
+  }
+
+  if (
+    lower.includes("api key") ||
+    (lower.includes("invalid argument") && lower.includes("key")) ||
+    lower.includes("permission denied") ||
+    msg.includes("401") ||
+    msg.includes("403")
+  ) {
+    return geminiError(
+      "config",
+      "The Gemini API key is invalid or this model is not enabled for your project.",
+      false
+    );
+  }
+
+  if (
+    lower.includes("fetch failed") ||
+    lower.includes("econn") ||
+    lower.includes("enotfound") ||
+    lower.includes("etimedout") ||
+    lower.includes("network") ||
+    lower.includes("socket") ||
+    lower.includes("getaddrinfo")
+  ) {
+    return geminiError(
+      "network",
+      "Network error. Check your connection and try again.",
+      true
+    );
+  }
+
+  const trimmed = msg.trim();
+  return geminiError(
+    "unknown",
+    trimmed || fallback,
+    true
+  );
+}
+
 function getModel() {
   const key = process.env.GEMINI_API_KEY;
   if (!key?.trim()) {
@@ -21,17 +126,38 @@ export type AtsMatchResult = {
   strengths: string[];
 };
 
+export type EstimateCTCResult =
+  | { ok: true; text: string }
+  | { ok: false; error: GeminiError };
+
+export type MatchResumeATSResult =
+  | { ok: true; data: AtsMatchResult }
+  | { ok: false; error: GeminiError };
+
 /** Estimate CTC for a role at a company in India (concise). */
-export async function estimateCTC(jobRole: string, company: string) {
+export async function estimateCTC(
+  jobRole: string,
+  company: string
+): Promise<EstimateCTCResult> {
   const session = await auth();
   if (!session?.user?.id) {
-    return { ok: false as const, error: "Unauthorized." };
+    return {
+      ok: false,
+      error: geminiError("unauthorized", "Sign in to use AI features.", false),
+    };
   }
 
   const role = jobRole.trim();
   const co = company.trim();
   if (!role || !co) {
-    return { ok: false as const, error: "Role and company are required." };
+    return {
+      ok: false,
+      error: geminiError(
+        "validation",
+        "Role and company are required.",
+        false
+      ),
+    };
   }
 
   try {
@@ -50,12 +176,21 @@ Respond in plain text only, no JSON.`;
     const result = await model.generateContent(prompt);
     const text = result.response.text().trim();
     if (!text) {
-      return { ok: false as const, error: "No response from the model." };
+      return {
+        ok: false,
+        error: geminiError(
+          "model_empty",
+          "The model returned no text. Try again.",
+          true
+        ),
+      };
     }
-    return { ok: true as const, text };
+    return { ok: true, text };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "CTC estimate failed.";
-    return { ok: false as const, error: msg };
+    return {
+      ok: false,
+      error: mapGeminiException(e, "CTC estimate failed."),
+    };
   }
 }
 
@@ -100,10 +235,13 @@ export async function matchResumeATS(
   resumeText: string,
   jobRole: string,
   company: string
-) {
+): Promise<MatchResumeATSResult> {
   const session = await auth();
   if (!session?.user?.id) {
-    return { ok: false as const, error: "Unauthorized." };
+    return {
+      ok: false,
+      error: geminiError("unauthorized", "Sign in to use AI features.", false),
+    };
   }
 
   const text = resumeText.trim();
@@ -111,16 +249,31 @@ export async function matchResumeATS(
   const co = company.trim();
 
   if (!text) {
-    return { ok: false as const, error: "Resume text is empty." };
+    return {
+      ok: false,
+      error: geminiError(
+        "validation",
+        "Résumé text is empty.",
+        false
+      ),
+    };
   }
   if (!role || !co) {
-    return { ok: false as const, error: "Role and company are required." };
+    return {
+      ok: false,
+      error: geminiError(
+        "validation",
+        "Role and company are required.",
+        false
+      ),
+    };
   }
 
-  const snippet = text.length > MAX_RESUME_CHARS
-    ? text.slice(0, MAX_RESUME_CHARS) +
-      "\n\n[…truncated for length; rest omitted…]"
-    : text;
+  const snippet =
+    text.length > MAX_RESUME_CHARS
+      ? text.slice(0, MAX_RESUME_CHARS) +
+        "\n\n[…truncated for length; rest omitted…]"
+      : text;
 
   try {
     const model = getModel();
@@ -144,13 +297,19 @@ ${snippet}
     const parsed = parseAtsJson(raw);
     if (!parsed) {
       return {
-        ok: false as const,
-        error: "Could not parse ATS result. Try again.",
+        ok: false,
+        error: geminiError(
+          "parse_error",
+          "Could not read the model response as JSON. Try again.",
+          true
+        ),
       };
     }
-    return { ok: true as const, data: parsed };
+    return { ok: true, data: parsed };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "ATS match failed.";
-    return { ok: false as const, error: msg };
+    return {
+      ok: false,
+      error: mapGeminiException(e, "ATS match failed."),
+    };
   }
 }

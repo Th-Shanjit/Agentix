@@ -8,12 +8,12 @@ import {
   useState,
 } from "react";
 import { FileText, Loader2, Trash2, UploadCloud } from "lucide-react";
+import { toast } from "sonner";
+import { saveResumeText } from "@/actions/user";
 import { extractPdfText } from "@/lib/pdf/extractPdfText";
 import {
   clearStoredResumeText,
-  getStoredResumeFileName,
   getStoredResumeText,
-  setStoredResumeText,
 } from "@/lib/resume-storage";
 import { cn } from "@/lib/cn";
 
@@ -21,58 +21,73 @@ function wordCount(text: string) {
   return text.trim() ? text.trim().split(/\s+/).length : 0;
 }
 
-export function ResumeUpload() {
+type ResumeUploadProps = {
+  /** Saved résumé text from Prisma (server). */
+  initialResumeText: string | null;
+};
+
+export function ResumeUpload({ initialResumeText }: ResumeUploadProps) {
   const inputId = useId();
-  const [text, setText] = useState("");
-  const [hydrated, setHydrated] = useState(false);
+  const [text, setText] = useState(initialResumeText ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const lastLoadedName = useRef<string | null>(null);
+  const migrated = useRef(false);
 
   useEffect(() => {
-    const saved = getStoredResumeText();
-    const savedName = getStoredResumeFileName();
-    if (saved) setText(saved);
-    if (savedName) lastLoadedName.current = savedName;
-    setHydrated(true);
-  }, []);
+    setText(initialResumeText ?? "");
+  }, [initialResumeText]);
 
-  const persist = useCallback((next: string, fileName?: string | null) => {
-    setText(next);
-    try {
-      if (next.length === 0) {
+  /** One-time migration from legacy localStorage → DB. */
+  useEffect(() => {
+    if (migrated.current) return;
+    if (initialResumeText?.trim()) {
+      migrated.current = true;
+      return;
+    }
+    const local = getStoredResumeText();
+    if (!local?.trim()) {
+      migrated.current = true;
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const r = await saveResumeText(local);
+      if (!cancelled && r.ok) {
         clearStoredResumeText();
-        lastLoadedName.current = null;
-      } else {
-        setStoredResumeText(next, fileName ?? lastLoadedName.current);
+        setText(local);
       }
-      setError(null);
+      migrated.current = true;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [initialResumeText]);
+
+  const handleFile = useCallback(async (file: File) => {
+    setError(null);
+    setBusy(true);
+    try {
+      const extracted = await extractPdfText(file);
+      if (!extracted) {
+        setError("No text could be read from this PDF (try another export).");
+        return;
+      }
+      lastLoadedName.current = file.name;
+      const r = await saveResumeText(extracted);
+      if (!r.ok) {
+        setError(r.error ?? "Could not save résumé to your account.");
+        return;
+      }
+      setText(extracted);
+      toast.success("Résumé saved to your account.");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save to storage.");
+      setError(e instanceof Error ? e.message : "Failed to read PDF.");
+    } finally {
+      setBusy(false);
     }
   }, []);
-
-  const handleFile = useCallback(
-    async (file: File) => {
-      setError(null);
-      setBusy(true);
-      try {
-        const extracted = await extractPdfText(file);
-        if (!extracted) {
-          setError("No text could be read from this PDF (try another export).");
-          return;
-        }
-        lastLoadedName.current = file.name;
-        persist(extracted, file.name);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to read PDF.");
-      } finally {
-        setBusy(false);
-      }
-    },
-    [persist]
-  );
 
   const onInputChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -94,18 +109,23 @@ export function ResumeUpload() {
     [handleFile]
   );
 
-  const clear = useCallback(() => {
-    lastLoadedName.current = null;
-    persist("");
-  }, [persist]);
-
-  if (!hydrated) {
-    return (
-      <div className="rounded-3xl border border-white/60 bg-white/35 p-10 text-center text-sm text-slate-500 shadow-glass backdrop-blur-2xl">
-        <Loader2 className="mx-auto h-6 w-6 animate-spin opacity-60" />
-      </div>
-    );
-  }
+  const clear = useCallback(async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      const r = await saveResumeText("");
+      if (!r.ok) {
+        setError(r.error ?? "Could not clear résumé.");
+        return;
+      }
+      lastLoadedName.current = null;
+      setText("");
+      clearStoredResumeText();
+      toast.success("Résumé cleared.");
+    } finally {
+      setBusy(false);
+    }
+  }, []);
 
   return (
     <section className="space-y-4">
@@ -153,7 +173,8 @@ export function ResumeUpload() {
             Drop a résumé PDF here
           </p>
           <p className="mt-1 text-xs text-slate-600">
-            Parsed only in your browser — nothing is uploaded to Agentix.
+            Parsed in your browser — PDF bytes are not uploaded; extracted text
+            is saved to your account.
           </p>
           <label
             htmlFor={inputId}
@@ -184,11 +205,11 @@ export function ResumeUpload() {
               />
               <div>
                 <p className="text-sm font-semibold text-slate-900">
-                  Extracted text
+                  Saved résumé text
                 </p>
                 <p className="text-xs text-slate-600">
                   {lastLoadedName.current
-                    ? `From ${lastLoadedName.current} · `
+                    ? `Last PDF: ${lastLoadedName.current} · `
                     : null}
                   {text.length.toLocaleString()} characters ·{" "}
                   {wordCount(text).toLocaleString()} words
@@ -197,8 +218,9 @@ export function ResumeUpload() {
             </div>
             <button
               type="button"
-              onClick={clear}
-              className="inline-flex items-center gap-1.5 rounded-full border border-white/60 bg-white/45 px-3 py-1.5 text-xs font-semibold text-slate-800 backdrop-blur-xl transition-all duration-300 hover:bg-white/65"
+              onClick={() => clear()}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/60 bg-white/45 px-3 py-1.5 text-xs font-semibold text-slate-800 backdrop-blur-xl transition-all duration-300 hover:bg-white/65 disabled:opacity-50"
             >
               <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
               Clear

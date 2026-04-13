@@ -23,5 +23,6 @@ export default {
     signIn: "/login",
   },
   trustHost: true,
-  secret: process.env.AUTH_SECRET,
+  /** Required for sessions/JWT. Set `AUTH_SECRET` in `.env.local` (see `.env.example`). */
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
 } satisfies NextAuthConfig;

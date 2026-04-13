@@ -1,4 +1,7 @@
-/** Browser-only helpers for cached resume plain text (never the PDF bytes). */
+/**
+ * Legacy browser helpers for one-time migration from localStorage → DB.
+ * Source of truth is `User.resumeText` (see `saveResumeText`).
+ */
 
 export const RESUME_TEXT_STORAGE_KEY = "agentix:resumeText";
 export const RESUME_FILENAME_STORAGE_KEY = "agentix:resumeFileName";

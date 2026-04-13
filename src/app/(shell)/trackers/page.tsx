@@ -17,11 +17,12 @@ export default async function TrackersPage() {
     <div className="space-y-6">
       <header className="rounded-3xl border border-white/60 bg-white/40 p-6 shadow-glass backdrop-blur-2xl transition-all duration-300">
         <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
-          Trackers
+          Job sources
         </h2>
         <p className="mt-2 max-w-2xl text-sm text-slate-600">
-          Point your GitHub Actions cron at the webhook with your secret; it
-          will create jobs for your user with source{" "}
+          Company career pages your automation watches. When your cron hits the
+          webhook, new roles can appear under{" "}
+          <strong>My jobs</strong> with source{" "}
           <code className="rounded-md bg-white/50 px-1.5 py-0.5 text-xs">
             Tracker
           </code>

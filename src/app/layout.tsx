@@ -16,8 +16,9 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Agentix — Career pipeline",
-  description: "Personal AI career pipeline: jobs, trackers, resume, ATS insights.",
+  title: "Agentix — Job search",
+  description:
+    "Track jobs, save résumé text, and get AI help with applications and ATS-style matching.",
 };
 
 export default async function RootLayout({

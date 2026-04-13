@@ -2,17 +2,23 @@ import type { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { canonicalJobUrl, jobDedupeKey } from "@/lib/job-url";
+import { toJobDTOFromJoin } from "@/lib/jobs";
 
 type RouteContext = { params: { id: string } };
 
-function buildUpdatePayload(
+function buildListingPayload(
   body: Record<string, unknown>
-): Prisma.JobUpdateManyMutationInput | null {
-  const data: Prisma.JobUpdateManyMutationInput = {};
+): Prisma.JobListingUpdateInput | null {
+  const data: Prisma.JobListingUpdateInput = {};
 
   if (typeof body.company === "string") data.company = body.company.trim();
-  if (typeof body.role === "string") data.role = body.role.trim();
-  if (typeof body.link === "string") data.link = body.link.trim();
+  if (typeof body.role === "string") data.title = body.role.trim();
+  if (typeof body.link === "string") {
+    const link = body.link.trim();
+    data.sourceUrl = canonicalJobUrl(link);
+    data.dedupeKey = jobDedupeKey(link);
+  }
   if (typeof body.ctc === "string" || body.ctc === null) {
     data.ctc =
       body.ctc === null
@@ -22,11 +28,10 @@ function buildUpdatePayload(
           : String(body.ctc).trim();
   }
   if (typeof body.source === "string") data.source = body.source.trim();
-  if (typeof body.applied === "boolean") data.applied = body.applied;
   if (typeof body.dateDiscovered === "string" && body.dateDiscovered) {
     const parsed = new Date(body.dateDiscovered);
     if (!Number.isNaN(parsed.getTime())) {
-      data.dateDiscovered = parsed;
+      data.postedAt = parsed;
     }
   }
 
@@ -40,8 +45,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id } = context.params;
-  if (!id) {
+  const { id: jobListingId } = context.params;
+  if (!jobListingId) {
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
   }
 
@@ -56,25 +61,49 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
-  const payload = buildUpdatePayload(body as Record<string, unknown>);
-  if (!payload) {
+  const raw = body as Record<string, unknown>;
+
+  const uj = await prisma.userJob.findFirst({
+    where: { userId, jobListingId },
+    include: { jobListing: true },
+  });
+
+  if (!uj) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (typeof raw.applied === "boolean") {
+    await prisma.userJob.update({
+      where: {
+        userId_jobListingId: { userId, jobListingId },
+      },
+      data: { applied: raw.applied },
+    });
+  }
+
+  const payload = buildListingPayload(raw);
+  if (payload) {
+    await prisma.jobListing.update({
+      where: { id: jobListingId },
+      data: payload,
+    });
+  }
+
+  if (!payload && typeof raw.applied !== "boolean") {
     return NextResponse.json(
       { error: "No valid fields to update" },
       { status: 400 }
     );
   }
 
-  const result = await prisma.job.updateMany({
-    where: { id, userId },
-    data: payload,
+  const next = await prisma.userJob.findUnique({
+    where: {
+      userId_jobListingId: { userId, jobListingId },
+    },
+    include: { jobListing: true },
   });
 
-  if (result.count === 0) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  const job = await prisma.job.findUnique({ where: { id } });
-  return NextResponse.json(job);
+  return NextResponse.json(next ? toJobDTOFromJoin(next) : null);
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
@@ -84,13 +113,13 @@ export async function DELETE(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id } = context.params;
-  if (!id) {
+  const { id: jobListingId } = context.params;
+  if (!jobListingId) {
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
   }
 
-  const result = await prisma.job.deleteMany({
-    where: { id, userId },
+  const result = await prisma.userJob.deleteMany({
+    where: { userId, jobListingId },
   });
 
   if (result.count === 0) {

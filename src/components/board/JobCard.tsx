@@ -15,6 +15,8 @@ type JobCardProps = {
   job: JobDTO;
   busy: boolean;
   aiBusy: boolean;
+  /** True while the row is optimistic (not yet persisted). */
+  pendingSync?: boolean;
   onAppliedChange: (id: string, applied: boolean) => void;
   onEstimateCtc: (job: JobDTO) => void;
   onMatchResume: (job: JobDTO) => void;
@@ -37,15 +39,20 @@ export function JobCard({
   job,
   busy,
   aiBusy,
+  pendingSync,
   onAppliedChange,
   onEstimateCtc,
   onMatchResume,
 }: JobCardProps) {
+  const syncPending = Boolean(pendingSync);
+  const actionsDisabled = aiBusy || syncPending;
+
   return (
     <article
       className={cn(
         "rounded-3xl border border-white/60 bg-white/40 p-5 shadow-glass backdrop-blur-2xl transition-all duration-300",
-        job.applied && "ring-1 ring-emerald-400/25"
+        job.applied && "ring-1 ring-emerald-400/25",
+        syncPending && "opacity-90"
       )}
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -72,7 +79,7 @@ export function JobCard({
           <div className="flex flex-wrap gap-2 pt-1">
             <button
               type="button"
-              disabled={aiBusy}
+              disabled={actionsDisabled}
               onClick={() => onEstimateCtc(job)}
               className={cn(
                 "inline-flex min-h-[44px] min-w-0 items-center gap-1.5 rounded-full border border-white/60 bg-white/45 px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm backdrop-blur-xl transition-all duration-300 sm:min-h-0 sm:py-1.5 active:scale-[0.99]",
@@ -84,7 +91,7 @@ export function JobCard({
             </button>
             <button
               type="button"
-              disabled={aiBusy}
+              disabled={actionsDisabled}
               onClick={() => onMatchResume(job)}
               className={cn(
                 "inline-flex min-h-[44px] min-w-0 items-center gap-1.5 rounded-full border border-white/60 bg-white/45 px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm backdrop-blur-xl transition-all duration-300 sm:min-h-0 sm:py-1.5 active:scale-[0.99]",
@@ -98,7 +105,11 @@ export function JobCard({
               href={job.link}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-h-[44px] min-w-0 items-center gap-1.5 rounded-full border border-white/60 bg-white/45 px-3 py-2 text-xs font-semibold text-violet-700 shadow-sm backdrop-blur-xl transition-all duration-300 sm:min-h-0 sm:py-1.5 active:scale-[0.99] hover:border-violet-300/60 hover:bg-white/65"
+              aria-disabled={syncPending}
+              className={cn(
+                "inline-flex min-h-[44px] min-w-0 items-center gap-1.5 rounded-full border border-white/60 bg-white/45 px-3 py-2 text-xs font-semibold text-violet-700 shadow-sm backdrop-blur-xl transition-all duration-300 sm:min-h-0 sm:py-1.5 active:scale-[0.99] hover:border-violet-300/60 hover:bg-white/65",
+                syncPending && "pointer-events-none opacity-50"
+              )}
             >
               Open posting
               <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.75} />
@@ -117,7 +128,7 @@ export function JobCard({
           </div>
           <IOSToggle
             checked={job.applied}
-            disabled={busy}
+            disabled={busy || syncPending}
             aria-label={`Mark ${job.role} at ${job.company} as applied`}
             onChange={(next) => onAppliedChange(job.id, next)}
           />

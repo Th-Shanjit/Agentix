@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { canonicalJobUrl, jobDedupeKey } from "@/lib/job-url";
+
+/** Hard cap per request to limit accidental or abusive large payloads. */
+const MAX_JOBS_PER_REQUEST = 100;
+
+export const maxDuration = 60;
 
 type IncomingJob = {
   company: string;
@@ -63,6 +69,15 @@ export async function POST(request: Request) {
     );
   }
 
+  if (jobsRaw.length > MAX_JOBS_PER_REQUEST) {
+    return NextResponse.json(
+      {
+        error: `Too many jobs in one request (max ${MAX_JOBS_PER_REQUEST}).`,
+      },
+      { status: 400 }
+    );
+  }
+
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -92,17 +107,43 @@ export async function POST(request: Request) {
     );
   }
 
-  await prisma.job.createMany({
-    data: jobs.map((j) => ({
-      userId,
-      company: j.company,
-      role: j.role,
-      link: j.link,
-      ctc: j.ctc,
-      applied: false,
-      source: "Tracker",
-    })),
-  });
+  let inserted = 0;
+  for (const j of jobs) {
+    const canonical = canonicalJobUrl(j.link);
+    const dedupeKey = jobDedupeKey(j.link);
+    const listing = await prisma.jobListing.upsert({
+      where: { dedupeKey },
+      create: {
+        title: j.role,
+        company: j.company,
+        sourceUrl: canonical,
+        dedupeKey,
+        ctc: j.ctc,
+        source: "Tracker",
+        postedAt: new Date(),
+      },
+      update: {
+        title: j.role,
+        company: j.company,
+        ctc: j.ctc ?? undefined,
+        sourceUrl: canonical,
+      },
+    });
 
-  return NextResponse.json({ inserted: jobs.length });
+    await prisma.userJob.upsert({
+      where: {
+        userId_jobListingId: { userId, jobListingId: listing.id },
+      },
+      create: {
+        userId,
+        jobListingId: listing.id,
+        applied: false,
+        saved: true,
+      },
+      update: {},
+    });
+    inserted += 1;
+  }
+
+  return NextResponse.json({ inserted });
 }

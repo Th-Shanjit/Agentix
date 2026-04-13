@@ -1,14 +1,49 @@
-import type { Job } from "@prisma/client";
+import type { JobListing, UserJob } from "@prisma/client";
 
-/** Serializable job shape for client components (RSC → client). */
-export type JobDTO = Omit<Job, "dateDiscovered"> & {
+/** Serializable job shape for client components (matches legacy `Job` fields). `id` is the shared `JobListing` id. */
+export type JobDTO = {
+  id: string;
+  userId: string;
+  company: string;
+  role: string;
   dateDiscovered: string;
+  ctc: string | null;
+  link: string;
+  applied: boolean;
+  source: string;
 };
 
-export function toJobDTO(job: Job): JobDTO {
+export function toJobDTOFromJoin(
+  uj: UserJob & { jobListing: JobListing }
+): JobDTO {
   return {
-    ...job,
-    dateDiscovered: job.dateDiscovered.toISOString(),
+    id: uj.jobListing.id,
+    userId: uj.userId,
+    company: uj.jobListing.company,
+    role: uj.jobListing.title,
+    link: uj.jobListing.sourceUrl,
+    dateDiscovered: uj.jobListing.postedAt.toISOString(),
+    ctc: uj.jobListing.ctc,
+    applied: uj.applied,
+    source: uj.jobListing.source,
+  };
+}
+
+export function toJobDTOFromListing(
+  listing: JobListing,
+  userId: string,
+  applied: boolean
+): JobDTO {
+  return {
+    id: listing.id,
+    userId,
+    company: listing.company,
+    role: listing.title,
+    link: listing.sourceUrl,
+    dateDiscovered: listing.postedAt.toISOString(),
+    ctc: listing.ctc,
+    applied,
+    source: listing.source,
   };
 }
 
