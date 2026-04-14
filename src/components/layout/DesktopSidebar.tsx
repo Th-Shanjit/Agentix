@@ -68,13 +68,21 @@ export function DesktopSidebar() {
             </div>
             <button
               type="button"
-              onClick={() => signOut({ callbackUrl: "/login" })}
+              onClick={() => signOut({ callbackUrl: "/board" })}
               className="flex w-full items-center justify-center gap-2 rounded-full border border-white/20 bg-white/10 py-2 text-xs font-semibold text-slate-100 backdrop-blur-xl transition-all duration-300 hover:bg-white/20"
             >
               <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} />
               Sign out
             </button>
           </>
+        )}
+        {status === "unauthenticated" && (
+          <Link
+            href="/login"
+            className="flex w-full items-center justify-center rounded-full border border-[#479761]/40 bg-[#479761]/90 py-2.5 text-xs font-semibold text-white transition-all duration-300 hover:bg-[#3d8254]"
+          >
+            Sign in
+          </Link>
         )}
       </div>
     </aside>

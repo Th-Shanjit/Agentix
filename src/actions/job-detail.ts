@@ -127,9 +127,6 @@ export async function loadJobDetail(
 > {
   const session = await auth();
   const userId = session?.user?.id;
-  if (!userId) {
-    return { ok: false, error: "Unauthorized." };
-  }
 
   const listing = await prisma.jobListing.findFirst({
     where: { id: jobListingId, ingestionStatus: "VALIDATED" },
@@ -137,6 +134,16 @@ export async function loadJobDetail(
 
   if (!listing) {
     return { ok: false, error: "Not found." };
+  }
+
+  if (!userId) {
+    const enrich = await prisma.jobEnrichment.findUnique({
+      where: { jobListingId },
+    });
+    return {
+      ok: true,
+      data: buildPayload(listing, enrich, null),
+    };
   }
 
   const [user, uj, enrich] = await Promise.all([

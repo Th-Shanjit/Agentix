@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 const { auth } = NextAuth(authConfig);
 
+/** App shell routes stay public; data APIs require a session (401 when anonymous). */
 export default auth((req) => {
   if (req.auth) {
     return NextResponse.next();
@@ -19,17 +20,9 @@ export default auth((req) => {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const login = new URL("/login", req.url);
-  login.searchParams.set("callbackUrl", `${pathname}${req.nextUrl.search}`);
-  return NextResponse.redirect(login);
+  return NextResponse.next();
 });
 
 export const config = {
-  matcher: [
-    "/board/:path*",
-    "/jobs/:path*",
-    "/profile/:path*",
-    "/api/jobs/:path*",
-    "/api/user/:path*",
-  ],
+  matcher: ["/api/jobs/:path*", "/api/user/:path*"],
 };

@@ -1,6 +1,6 @@
 import { LoginClient } from "./LoginClient";
 import { auth } from "@/auth";
-import { isGoogleConfigured } from "@/auth.config";
+import { isGoogleOAuthEnabled } from "@/auth.config";
 import { redirect } from "next/navigation";
 
 /** Always read env at request time (avoids stale “no providers” UI on Vercel). */
@@ -20,7 +20,7 @@ export default async function LoginPage({
     redirect(callbackUrl);
   }
 
-  const googleEnabled = isGoogleConfigured();
+  const googleEnabled = isGoogleOAuthEnabled();
   const emailEnabled = Boolean(
     process.env.EMAIL_SERVER && process.env.EMAIL_FROM
   );
@@ -30,7 +30,6 @@ export default async function LoginPage({
       googleEnabled={googleEnabled}
       emailEnabled={emailEnabled}
       defaultCallbackUrl={callbackUrl}
-      showVercelEnvHint={Boolean(process.env.VERCEL)}
     />
   );
 }

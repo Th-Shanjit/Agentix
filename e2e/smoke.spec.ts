@@ -11,25 +11,16 @@ test.describe("deploy smoke: routes and auth boundaries", () => {
     ).toBeVisible();
   });
 
-  test("board redirects unauthenticated users to login", async ({ page }) => {
+  test("board shell is public; jobs list is empty without session", async ({
+    page,
+  }) => {
     await page.goto("/board", gotoOpts);
-    await expect(page).toHaveURL(/\/login/);
-  });
-
-  test("search redirects unauthenticated users to login", async ({ page }) => {
-    await page.goto("/search", gotoOpts);
-    await expect(page).toHaveURL(/\/login/);
+    await expect(page).toHaveURL(/\/board/);
+    await expect(page.getByRole("heading", { name: "My jobs" })).toBeVisible();
   });
 
   test("GET /api/jobs returns 401 without session", async ({ request }) => {
     const res = await request.get("/api/jobs");
-    expect(res.status()).toBe(401);
-  });
-
-  test("GET /api/search/jobs returns 401 without session", async ({
-    request,
-  }) => {
-    const res = await request.get("/api/search/jobs");
     expect(res.status()).toBe(401);
   });
 

@@ -25,9 +25,16 @@ export function isGoogleConfigured() {
   return Boolean(clientId) && Boolean(clientSecret);
 }
 
+/** Google OAuth is opt-in (set `AUTH_GOOGLE_ENABLED=true`) so email/password stays the default. */
+export function isGoogleOAuthEnabled() {
+  return (
+    process.env.AUTH_GOOGLE_ENABLED === "true" && isGoogleConfigured()
+  );
+}
+
 const providers: NextAuthConfig["providers"] = [];
 
-if (isGoogleConfigured()) {
+if (isGoogleOAuthEnabled()) {
   const { clientId, clientSecret } = googleCreds();
   providers.push(
     Google({
