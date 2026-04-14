@@ -3,9 +3,14 @@ import { JobBoard } from "@/components/board/JobBoard";
 import { prisma } from "@/lib/prisma";
 import { toJobDTOFromJoin } from "@/lib/jobs";
 
-export default async function BoardPage() {
+export default async function BoardPage({
+  searchParams,
+}: {
+  searchParams?: { refresh?: string };
+}) {
   const session = await auth();
   const userId = session?.user?.id;
+  const shouldRefresh = searchParams?.refresh === "1";
 
   const rows = userId
     ? await prisma.userJob.findMany({
@@ -29,7 +34,11 @@ export default async function BoardPage() {
         </p>
       </header>
 
-      <JobBoard initialJobs={initialJobs} userId={userId ?? ""} />
+      <JobBoard
+        initialJobs={initialJobs}
+        userId={userId ?? ""}
+        autoRefreshOnMount={shouldRefresh}
+      />
     </div>
   );
 }

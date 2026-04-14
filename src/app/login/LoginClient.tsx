@@ -8,11 +8,19 @@ import { GlassBackground } from "@/components/layout/GlassBackground";
 type LoginClientProps = {
   googleEnabled: boolean;
   emailEnabled: boolean;
+  defaultCallbackUrl: string;
 };
 
-function LoginForm({ googleEnabled, emailEnabled }: LoginClientProps) {
+function LoginForm({
+  googleEnabled,
+  emailEnabled,
+  defaultCallbackUrl,
+}: LoginClientProps) {
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/board";
+  const callbackRaw = searchParams.get("callbackUrl");
+  const callbackUrl =
+    callbackRaw && callbackRaw.startsWith("/") ? callbackRaw : defaultCallbackUrl;
+  const authError = searchParams.get("error");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -32,6 +40,17 @@ function LoginForm({ googleEnabled, emailEnabled }: LoginClientProps) {
     } catch {
       setMessage("Could not send sign-in email. Check server logs and SMTP.");
     } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    setMessage(null);
+    setBusy(true);
+    try {
+      await signIn("google", { callbackUrl, redirect: true });
+    } catch {
+      setMessage("Google sign-in failed. Please try again.");
       setBusy(false);
     }
   }
@@ -73,7 +92,7 @@ function LoginForm({ googleEnabled, emailEnabled }: LoginClientProps) {
             <button
               type="button"
               disabled={busy}
-              onClick={() => signIn("google", { callbackUrl })}
+              onClick={() => void handleGoogleSignIn()}
               className="mt-4 flex w-full items-center justify-center rounded-full border border-white/60 bg-white/50 py-3 text-sm font-semibold text-slate-900 shadow-sm backdrop-blur-xl transition-all duration-300 hover:bg-white/70 disabled:opacity-60"
             >
               Continue with Google
@@ -105,6 +124,11 @@ function LoginForm({ googleEnabled, emailEnabled }: LoginClientProps) {
 
           {message && (
             <p className="mt-4 text-center text-sm text-red-600">{message}</p>
+          )}
+          {!message && authError && (
+            <p className="mt-4 text-center text-sm text-red-600">
+              Sign-in failed ({authError}). Please try again.
+            </p>
           )}
         </div>
       </div>

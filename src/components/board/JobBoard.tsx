@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Briefcase, Plus, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { addManualJob, toggleJobAppliedStatus } from "@/actions/jobs";
@@ -23,6 +23,7 @@ import { cn } from "@/lib/cn";
 type JobBoardProps = {
   initialJobs: JobDTO[];
   userId: string;
+  autoRefreshOnMount?: boolean;
 };
 
 type AiOpen =
@@ -43,8 +44,13 @@ type CtcErrState =
   | { kind: "gemini"; error: GeminiError }
   | { kind: "save"; message: string };
 
-export function JobBoard({ initialJobs, userId }: JobBoardProps) {
+export function JobBoard({
+  initialJobs,
+  userId,
+  autoRefreshOnMount = false,
+}: JobBoardProps) {
   const [jobs, setJobs] = useState<JobDTO[]>(initialJobs);
+  const hasAutoRefreshed = useRef(false);
 
   useEffect(() => {
     setJobs(initialJobs);
@@ -259,6 +265,12 @@ export function JobBoard({ initialJobs, userId }: JobBoardProps) {
       setRefreshing(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (!autoRefreshOnMount || hasAutoRefreshed.current) return;
+    hasAutoRefreshed.current = true;
+    void refresh();
+  }, [autoRefreshOnMount, refresh]);
 
   const empty = jobs.length === 0;
 

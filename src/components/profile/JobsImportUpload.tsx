@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { FileUp, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { importUploadJobs, type UploadJobInput } from "@/actions/jobs";
@@ -135,6 +136,7 @@ function parseJson(text: string): ParseResult {
 }
 
 export function JobsImportUpload() {
+  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [rows, setRows] = useState<UploadJobInput[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
@@ -186,6 +188,7 @@ export function JobsImportUpload() {
       }
       setRows([]);
       setErrors([]);
+      router.push("/board?refresh=1");
     } finally {
       setBusy(false);
     }
