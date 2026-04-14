@@ -12,10 +12,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#19181A" },
-    { media: "(prefers-color-scheme: light)", color: "#B19F9E" },
-  ],
+  /** Default UI chrome matches dark shell; light mode still overrides via `data-theme`. */
+  themeColor: "#19181A",
 };
 
 export const metadata: Metadata = {

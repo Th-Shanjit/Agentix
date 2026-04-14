@@ -118,16 +118,16 @@ export function JobCard({
             <CalendarDays className="h-3.5 w-3.5 shrink-0 opacity-70" strokeWidth={1.75} />
             Discovered {formatDiscovered(job.dateDiscovered)}
           </p>
-          {(job.experienceYearsMin != null || job.experienceYearsMax != null) && (
-            <p className="text-xs text-slate-300">
-              Experience:{" "}
-              {job.experienceYearsMin != null && job.experienceYearsMax != null
-                ? `${job.experienceYearsMin}-${job.experienceYearsMax} years`
-                : job.experienceYearsMin != null
-                  ? `${job.experienceYearsMin}+ years`
-                  : `up to ${job.experienceYearsMax} years`}
-            </p>
-          )}
+          <p className="text-xs text-slate-300">
+            Experience:{" "}
+            {job.experienceYearsMin != null && job.experienceYearsMax != null
+              ? `${job.experienceYearsMin}-${job.experienceYearsMax} years`
+              : job.experienceYearsMin != null
+                ? `${job.experienceYearsMin}+ years`
+                : job.experienceYearsMax != null
+                  ? `up to ${job.experienceYearsMax} years`
+                  : "Nil"}
+          </p>
           {job.ctcRange && (
             <p className="text-sm font-medium text-[#CEBC81]">
               Est. CTC range: {formatRangeLabel(job.ctcRange)}

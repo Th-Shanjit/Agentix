@@ -28,6 +28,10 @@ enum IngestionStatus {
   REJECTED
 }
 
+enum AlertDigestFrequency {
+  DAILY
+}
+
 model User {
   id                     String            @id @default(cuid())
   name                   String?
@@ -37,13 +41,18 @@ model User {
   resumeText             String?           @db.Text
   yearsExperience        Int?
   preferredCountries     Json?
+  preferredRoles         Json?
   searchRemotePreference RemotePreference? @default(ANY)
+  alertEmailsEnabled     Boolean           @default(true)
+  alertDigestFrequency   AlertDigestFrequency @default(DAILY)
+  lastAlertDigestAt      DateTime?
   createdAt              DateTime          @default(now())
   accounts               Account[]
   sessions               Session[]
   userJobs               UserJob[]
   trackers               Tracker[]
   matchCaches            JobMatchCache[]
+  alertEvents            AlertEvent[]
 
   @@index([email])
 }
@@ -119,6 +128,7 @@ model JobListing {
   userJobs     UserJob[]
   matchCaches  JobMatchCache[]
   enrichment   JobEnrichment?
+  alertEvents  AlertEvent[]
 
   @@index([postedAt])
   @@index([company])
@@ -179,6 +189,25 @@ model Tracker {
   company String
   url     String
   active  Boolean @default(true)
+  alertEvents AlertEvent[]
 
   @@index([userId])
+  @@index([company])
+}
+
+model AlertEvent {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobListingId  String
+  jobListing    JobListing @relation(fields: [jobListingId], references: [id], onDelete: Cascade)
+  trackerId     String?
+  tracker       Tracker? @relation(fields: [trackerId], references: [id], onDelete: SetNull)
+  matchedRole   String?
+  sentAt        DateTime?
+  createdAt     DateTime @default(now())
+
+  @@unique([userId, jobListingId])
+  @@index([userId, sentAt])
+  @@index([createdAt])
 }

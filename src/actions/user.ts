@@ -36,7 +36,10 @@ export async function updateSearchPreferences(data: {
   yearsExperience: number | null;
   /** Comma-separated ISO country names or codes, e.g. "India, UK". */
   preferredCountries: string;
+  /** Comma/newline separated preferred role titles for alerts. */
+  preferredRoles: string;
   searchRemotePreference: RemotePreference;
+  alertEmailsEnabled: boolean;
 }) {
   const session = await auth();
   const userId = session?.user?.id;
@@ -48,6 +51,11 @@ export async function updateSearchPreferences(data: {
   const arr = raw
     ? raw.split(",").map((s) => s.trim()).filter(Boolean)
     : [];
+  const rolesRaw = data.preferredRoles
+    .split(/[\n,]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 20);
 
   try {
     await prisma.user.update({
@@ -55,7 +63,10 @@ export async function updateSearchPreferences(data: {
       data: {
         yearsExperience: data.yearsExperience,
         preferredCountries: arr.length ? arr : Prisma.JsonNull,
+        preferredRoles: rolesRaw.length ? rolesRaw : Prisma.JsonNull,
         searchRemotePreference: data.searchRemotePreference,
+        alertEmailsEnabled: data.alertEmailsEnabled,
+        alertDigestFrequency: "DAILY",
       },
     });
     return { ok: true as const };

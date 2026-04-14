@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { canonicalJobUrl, jobDedupeKey } from "@/lib/job-url";
+import { stageAlertCandidatesForListing } from "@/lib/alerts/stage";
 
 /** Hard cap per request to limit accidental or abusive large payloads. */
 const MAX_JOBS_PER_REQUEST = 100;
@@ -193,6 +194,11 @@ export async function POST(request: Request) {
         saved: true,
       },
       update: {},
+    });
+    await stageAlertCandidatesForListing({
+      jobListingId: listing.id,
+      company: listing.company,
+      role: listing.title,
     });
     inserted += 1;
   }

@@ -10,7 +10,9 @@ export default async function ProfilePage() {
   let initialResumeText: string | null = null;
   let yearsExperience: number | null = null;
   let preferredCountriesStr = "";
+  let preferredRolesStr = "";
   let searchRemote: "ANY" | "REMOTE_ONLY" | "HYBRID" | "ONSITE" = "ANY";
+  let alertEmailsEnabled = true;
 
   if (session?.user?.id) {
     const user = await prisma.user.findUnique({
@@ -19,7 +21,9 @@ export default async function ProfilePage() {
         resumeText: true,
         yearsExperience: true,
         preferredCountries: true,
+        preferredRoles: true,
         searchRemotePreference: true,
+        alertEmailsEnabled: true,
       },
     });
     initialResumeText = user?.resumeText ?? null;
@@ -33,6 +37,13 @@ export default async function ProfilePage() {
     if (user?.searchRemotePreference) {
       searchRemote = user.searchRemotePreference;
     }
+    const pr = user?.preferredRoles;
+    if (Array.isArray(pr)) {
+      preferredRolesStr = pr
+        .filter((x): x is string => typeof x === "string")
+        .join(", ");
+    }
+    alertEmailsEnabled = user?.alertEmailsEnabled ?? true;
   }
 
   return (
@@ -69,7 +80,9 @@ export default async function ProfilePage() {
         <ProfileSearchPrefs
           initialYears={yearsExperience}
           initialCountries={preferredCountriesStr}
+          initialRoles={preferredRolesStr}
           initialRemote={searchRemote}
+          initialAlertEmailsEnabled={alertEmailsEnabled}
         />
       )}
     </div>

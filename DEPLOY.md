@@ -68,9 +68,15 @@ If `CRON_WEBHOOK_SECRET` is unset, the route returns **503** (disabled). There i
 { "query": "software engineer remote", "page": 1 }
 ```
 
-Requires **`RAPIDAPI_KEY`** (RapidAPI JSearch). Jobs are deduped by URL and appear under **Search** and can be saved to **My jobs**. If the body omits `query`, `DEFAULT_INGEST_QUERY` is used when set.
+Requires **`RAPIDAPI_KEY`** (RapidAPI JSearch). Jobs are deduped by URL and can be saved to **My jobs**. If the body omits `query`, `DEFAULT_INGEST_QUERY` is used when set.
 
 The repo includes [`.github/workflows/ingest-jobs.yml`](./.github/workflows/ingest-jobs.yml) (optional): set repository secrets `CRON_WEBHOOK_SECRET`, `INGEST_URL` (e.g. `https://your-app.vercel.app/api/webhooks/ingest-jobs`), and optionally `INGEST_JSON` for the POST body.
+
+### Alerts digest
+
+`POST /api/webhooks/alerts-digest` uses the same secret header and sends pending daily alert emails for users with alert email enabled.
+
+The repo includes [`.github/workflows/alerts-digest.yml`](./.github/workflows/alerts-digest.yml): set `CRON_WEBHOOK_SECRET` and `ALERTS_DIGEST_URL` (e.g. `https://your-app.vercel.app/api/webhooks/alerts-digest`).
 
 ## 5. Security behavior (what the app does)
 

@@ -30,6 +30,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (raw !== "light" && raw !== "dark") {
+      window.localStorage.setItem(STORAGE_KEY, "dark");
+    }
     const initial: Theme = raw === "light" ? "light" : "dark";
     setThemeState(initial);
     applyTheme(initial);

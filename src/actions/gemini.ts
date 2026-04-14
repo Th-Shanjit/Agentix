@@ -57,11 +57,29 @@ export type MatchResumeATSResult =
   | { ok: true; data: AtsMatchResult }
   | { ok: false; error: GeminiError };
 
-/** Estimate CTC for a role at a company in India (concise). */
+/** If model returns annual band as lakhs (e.g. 11–17) instead of rupees, scale to INR. */
+function normalizeInrAnnualRupees(low: number, high: number): { low: number; high: number } {
+  const lo = Math.max(0, Math.round(low));
+  const hi = Math.max(0, Math.round(high));
+  if (hi === 0) return { low: lo, high: hi };
+  // Typical LPA bands are 1–50; values in this range are almost certainly "lakhs" not rupees.
+  if (hi < 100_000 && hi <= 50 && lo <= 50) {
+    return { low: lo * 100_000, high: hi * 100_000 };
+  }
+  return { low: lo, high: hi };
+}
+
+export type EstimateCTCOptions = {
+  /** Force Indian market, INR only, annual LPA; summary must not mix $ with L/lakh. */
+  inrOnly?: boolean;
+};
+
+/** Estimate CTC for a role at a company (concise). */
 export async function estimateCTC(
   jobRole: string,
   company: string,
-  location?: string | null
+  location?: string | null,
+  options?: EstimateCTCOptions
 ): Promise<EstimateCTCResult> {
   const session = await auth();
   if (!session?.user?.id) {
@@ -84,9 +102,34 @@ export async function estimateCTC(
     };
   }
 
+  const inrOnly = options?.inrOnly === true;
+
   try {
     const model = getModel();
-    const prompt = `Estimate compensation for role "${role}" at company "${company}".
+    const prompt = inrOnly
+      ? `Estimate TOTAL ANNUAL compensation in INDIA for role "${role}" at company "${company}".
+Location/context: "${(location ?? "").trim() || "unknown"}"
+
+STRICT RULES (INR-only regeneration):
+- Output MUST use Indian market norms only. Currency MUST be exactly "INR" in JSON.
+- low, mid, high MUST be total annual compensation in Indian Rupees (full integer amounts). Example: 11–17 LPA means low=1100000, high=1700000, mid around midpoint.
+- period MUST be "YEARLY". format MUST be "LPA".
+- In "summary", use INR and Indian wording only (LPA, lakhs, crores). NEVER prefix with $, €, or hybrid forms like "$1.1L" or "USD" with L/lakh.
+- Be concise (under 180 words). Explain basis (city tier, level, comps). Include a short "sources considered" note (categories only, no links).
+
+Return ONLY one JSON object:
+{
+  "summary": "string",
+  "range": {
+    "low": number,
+    "mid": number,
+    "high": number,
+    "currency": "INR",
+    "period": "YEARLY",
+    "format": "LPA"
+  }
+}`
+      : `Estimate compensation for role "${role}" at company "${company}".
 Known location/context: "${(location ?? "").trim() || "unknown"}"
 
 Rules:
@@ -143,28 +186,47 @@ Return ONLY one JSON object:
       rangeRaw && typeof rangeRaw === "object"
         ? parseRangeNumber((rangeRaw as { mid?: unknown }).mid)
         : null;
-    const range: Extract<EstimateCTCResult, { ok: true }>["range"] =
-      rangeRaw &&
-      typeof rangeRaw === "object" &&
-      typeof (rangeRaw as { currency?: unknown }).currency === "string" &&
-      low != null &&
-      high != null
-        ? {
-            low,
-            mid: mid ?? Math.round((low + high) / 2),
-            high,
-            currency: (rangeRaw as { currency: string }).currency,
-            period:
-              (rangeRaw as { period?: unknown }).period === "MONTHLY"
-                ? "MONTHLY"
-                : "YEARLY",
-            format:
-              (rangeRaw as { format?: unknown }).format === "LPA" ||
-              (rangeRaw as { format?: unknown }).format === "K"
-                ? ((rangeRaw as { format: "LPA" | "K" }).format ?? "RAW")
-                : "RAW",
-          }
-        : null;
+    let range: Extract<EstimateCTCResult, { ok: true }>["range"] = null;
+    if (rangeRaw && typeof rangeRaw === "object" && low != null && high != null) {
+      let lo = low;
+      let hi = high;
+      let mi = mid ?? Math.round((low + high) / 2);
+      if (inrOnly) {
+        const n = normalizeInrAnnualRupees(lo, hi);
+        lo = n.low;
+        hi = n.high;
+        mi =
+          mid != null
+            ? normalizeInrAnnualRupees(mid, mid).low
+            : Math.round((lo + hi) / 2);
+      }
+      if (inrOnly) {
+        range = {
+          low: lo,
+          mid: mi,
+          high: hi,
+          currency: "INR",
+          period: "YEARLY",
+          format: "LPA",
+        };
+      } else if (typeof (rangeRaw as { currency?: unknown }).currency === "string") {
+        range = {
+          low: lo,
+          mid: mi,
+          high: hi,
+          currency: (rangeRaw as { currency: string }).currency,
+          period:
+            (rangeRaw as { period?: unknown }).period === "MONTHLY"
+              ? "MONTHLY"
+              : "YEARLY",
+          format:
+            (rangeRaw as { format?: unknown }).format === "LPA" ||
+            (rangeRaw as { format?: unknown }).format === "K"
+              ? ((rangeRaw as { format: "LPA" | "K" }).format ?? "RAW")
+              : "RAW",
+        };
+      }
+    }
     if (!text) {
       return {
         ok: false,

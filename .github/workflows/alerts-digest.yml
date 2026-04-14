@@ -1,0 +1,29 @@
+# Optional: scheduled alerts digest. Configure repo secrets:
+#   CRON_WEBHOOK_SECRET — same as production CRON_WEBHOOK_SECRET
+#   ALERTS_DIGEST_URL — full URL to POST, e.g. https://your-app.vercel.app/api/webhooks/alerts-digest
+
+name: Send alerts digest
+
+on:
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: POST alerts digest webhook
+        env:
+          SECRET: ${{ secrets.CRON_WEBHOOK_SECRET }}
+          URL: ${{ secrets.ALERTS_DIGEST_URL }}
+        run: |
+          if [ -z "$SECRET" ] || [ -z "$URL" ]; then
+            echo "Skip: set CRON_WEBHOOK_SECRET and ALERTS_DIGEST_URL repository secrets."
+            exit 0
+          fi
+          curl -sS -X POST "$URL" \
+            -H "Content-Type: application/json" \
+            -H "x-agentix-secret: $SECRET" \
+            -d "{}" \
+            -w "\nHTTP %{http_code}\n"

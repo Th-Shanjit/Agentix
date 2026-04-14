@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { canonicalJobUrl, jobDedupeKey } from "@/lib/job-url";
 import {
   batchSearchMatch,
+  extractExperienceYearsBatch,
   rankRoleSimilarity,
 } from "@/actions/gemini-job-features";
 import {
@@ -177,13 +178,38 @@ export async function importUploadJobs(data: {
     allowedTempIds.has(`upload-${idx}`)
   );
 
+  const expInputs = aiMatchedJobs.map((job, idx) => ({
+    key: `u${idx}`,
+    title: (job.role ?? "Not yet listed").trim() || "Not yet listed",
+    company: job.company,
+    location: job.location,
+    description: job.description,
+  }));
+
+  let experienceByKey: Record<
+    string,
+    { experienceYearsMin: number | null; experienceYearsMax: number | null }
+  > = {};
+  if (expInputs.length > 0) {
+    const expResult = await extractExperienceYearsBatch(expInputs);
+    if (expResult.ok) {
+      experienceByKey = expResult.byKey;
+    }
+  }
+
   const savedJobs: JobDTO[] = [];
   const existingByCompany = await prisma.jobListing.findMany({
     where: { userJobs: { some: { userId } } },
     select: { id: true, company: true, title: true },
   });
 
-  for (const job of aiMatchedJobs) {
+  for (let jobIdx = 0; jobIdx < aiMatchedJobs.length; jobIdx++) {
+    const job = aiMatchedJobs[jobIdx];
+    const extracted =
+      experienceByKey[`u${jobIdx}`] ?? {
+        experienceYearsMin: null,
+        experienceYearsMax: null,
+      };
     const intendedRole = job.intendedRole?.trim() || job.role?.trim() || "";
     const companyExisting = existingByCompany.filter(
       (r) => r.company.toLowerCase() === job.company.toLowerCase()
@@ -249,6 +275,8 @@ export async function importUploadJobs(data: {
           description: job.description,
           location: job.location,
           remotePolicy: job.remotePolicy,
+          experienceYearsMin: extracted.experienceYearsMin,
+          experienceYearsMax: extracted.experienceYearsMax,
         },
         update: {
           title: (job.role ?? "Not yet listed").trim() || "Not yet listed",
@@ -259,6 +287,8 @@ export async function importUploadJobs(data: {
           description: job.description,
           location: job.location,
           remotePolicy: job.remotePolicy,
+          experienceYearsMin: extracted.experienceYearsMin,
+          experienceYearsMax: extracted.experienceYearsMax,
         },
       });
 
@@ -282,6 +312,35 @@ export async function importUploadJobs(data: {
       });
     });
     if (uj) savedJobs.push(toJobDTOFromJoin(uj));
+
+    // Track company career page sources (placeholder rows from uploads) for future alerts.
+    const shouldTrackCareerPage =
+      (job.role ?? "").trim().toLowerCase() === "not yet listed";
+    if (shouldTrackCareerPage) {
+      const trackerUrl =
+        job.link && URL.canParse(job.link)
+          ? canonicalJobUrl(job.link)
+          : canonical;
+      const existingTracker = await prisma.tracker.findFirst({
+        where: { userId, url: trackerUrl },
+        select: { id: true },
+      });
+      if (existingTracker) {
+        await prisma.tracker.update({
+          where: { id: existingTracker.id },
+          data: { active: true, company: job.company },
+        });
+      } else {
+        await prisma.tracker.create({
+          data: {
+            userId,
+            company: job.company,
+            url: trackerUrl,
+            active: true,
+          },
+        });
+      }
+    }
   }
 
   return {

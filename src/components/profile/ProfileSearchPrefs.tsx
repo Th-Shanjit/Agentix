@@ -8,7 +8,9 @@ import type { RemotePreference } from "@prisma/client";
 type ProfileSearchPrefsProps = {
   initialYears: number | null;
   initialCountries: string;
+  initialRoles: string;
   initialRemote: RemotePreference;
+  initialAlertEmailsEnabled: boolean;
 };
 
 const REMOTE_OPTIONS: { value: RemotePreference; label: string }[] = [
@@ -21,13 +23,19 @@ const REMOTE_OPTIONS: { value: RemotePreference; label: string }[] = [
 export function ProfileSearchPrefs({
   initialYears,
   initialCountries,
+  initialRoles,
   initialRemote,
+  initialAlertEmailsEnabled,
 }: ProfileSearchPrefsProps) {
   const [years, setYears] = useState(
     initialYears != null ? String(initialYears) : ""
   );
   const [countries, setCountries] = useState(initialCountries);
+  const [roles, setRoles] = useState(initialRoles);
   const [remote, setRemote] = useState<RemotePreference>(initialRemote);
+  const [alertEmailsEnabled, setAlertEmailsEnabled] = useState(
+    initialAlertEmailsEnabled
+  );
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
@@ -38,7 +46,9 @@ export function ProfileSearchPrefs({
       const r = await updateSearchPreferences({
         yearsExperience: !Number.isNaN(y) ? y : null,
         preferredCountries: countries,
+        preferredRoles: roles,
         searchRemotePreference: remote,
+        alertEmailsEnabled,
       });
       if (!r.ok) throw new Error(r.error);
       toast.success("Saved.");
@@ -90,6 +100,27 @@ export function ProfileSearchPrefs({
               </option>
             ))}
           </select>
+        </label>
+        <label className="block text-xs font-medium text-slate-600">
+          Preferred roles for alerts (comma-separated)
+          <input
+            value={roles}
+            onChange={(e) => setRoles(e.target.value)}
+            placeholder="Associate Product Manager, Junior Product Manager"
+            className="mt-1 w-full max-w-lg rounded-2xl border border-white/60 bg-white/50 px-3 py-2 text-sm text-slate-900 backdrop-blur-xl"
+          />
+          <span className="mt-1 block text-[11px] text-slate-500">
+            Daily email alerts use these roles to detect relevant openings.
+          </span>
+        </label>
+        <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
+          <input
+            type="checkbox"
+            checked={alertEmailsEnabled}
+            onChange={(e) => setAlertEmailsEnabled(e.target.checked)}
+            className="h-4 w-4 rounded border-white/60 bg-white/50"
+          />
+          Enable daily alert emails
         </label>
         <button
           type="submit"

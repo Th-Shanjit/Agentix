@@ -4,10 +4,12 @@
 
 :root {
   --shell-bg: #19181A;
+  color-scheme: dark;
 }
 
 html[data-theme="light"] {
   --shell-bg: #B19F9E;
+  color-scheme: light;
 }
 
 html {
@@ -34,6 +36,7 @@ html[data-theme="light"] *:focus-visible {
 
 /* Explicit theme tokens for shared shell components (safer than wildcard class overrides). */
 html[data-theme="dark"] {
+  color-scheme: dark;
   --surface-bg: rgb(25 24 26 / 0.75);
   --surface-border: rgb(255 255 255 / 0.16);
   --surface-text: rgb(226 232 240);

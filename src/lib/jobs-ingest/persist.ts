@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { canonicalJobUrl, jobDedupeKey } from "@/lib/job-url";
+import { stageAlertCandidatesForListing } from "@/lib/alerts/stage";
 import type { NormalizedJob } from "./types";
 import { validateNormalizedJob } from "./validate";
 
@@ -55,7 +56,7 @@ export async function persistNormalizedJobs(
       rawPayload: j.raw as Prisma.InputJsonValue,
     };
 
-    await prisma.jobListing.upsert({
+    const listing = await prisma.jobListing.upsert({
       where: { dedupeKey },
       create: data,
       update: {
@@ -74,6 +75,11 @@ export async function persistNormalizedJobs(
         rawPayload: j.raw as Prisma.InputJsonValue,
         ingestionStatus: "VALIDATED",
       },
+    });
+    await stageAlertCandidatesForListing({
+      jobListingId: listing.id,
+      company: listing.company,
+      role: listing.title,
     });
     inserted += 1;
   }

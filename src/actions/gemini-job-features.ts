@@ -573,3 +573,133 @@ Each "text" is full résumé body plain text, ready to paste.`;
     };
   }
 }
+
+export type ExperienceYearsExtracted = {
+  experienceYearsMin: number | null;
+  experienceYearsMax: number | null;
+};
+
+function normalizeExperienceYearsPair(
+  min: unknown,
+  max: unknown
+): ExperienceYearsExtracted {
+  const toInt = (v: unknown): number | null => {
+    if (typeof v !== "number" || !Number.isFinite(v)) return null;
+    return Math.round(v);
+  };
+  let lo = toInt(min);
+  let hi = toInt(max);
+  if (lo !== null) lo = Math.max(0, Math.min(60, lo));
+  if (hi !== null) hi = Math.max(0, Math.min(60, hi));
+  if (lo !== null && hi !== null && hi < lo) {
+    const t = lo;
+    lo = hi;
+    hi = t;
+  }
+  return { experienceYearsMin: lo, experienceYearsMax: hi };
+}
+
+/**
+ * Batched extraction of required professional experience (years) from posting text.
+ * Handles varied phrasing; returns nulls when nothing is stated or parsing fails for a row.
+ */
+export async function extractExperienceYearsBatch(
+  items: {
+    key: string;
+    title: string;
+    company: string;
+    location?: string | null;
+    description?: string | null;
+  }[]
+): Promise<
+  | { ok: true; byKey: Record<string, ExperienceYearsExtracted> }
+  | { ok: false; error: GeminiError }
+> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return {
+      ok: false,
+      error: geminiError("unauthorized", "Sign in to use AI features.", false),
+    };
+  }
+
+  const byKey: Record<string, ExperienceYearsExtracted> = {};
+  for (const it of items) {
+    byKey[it.key] = { experienceYearsMin: null, experienceYearsMax: null };
+  }
+
+  const needModel = items.filter((it) => (it.description ?? "").trim().length > 0);
+  if (needModel.length === 0) {
+    return { ok: true, byKey };
+  }
+
+  const CHUNK = 5;
+  const MAX_TEXT = 6000;
+
+  try {
+    const model = getGeminiModel();
+    for (let i = 0; i < needModel.length; i += CHUNK) {
+      const chunk = needModel.slice(i, i + CHUNK);
+      const payload = chunk.map((it) => ({
+        key: it.key,
+        title: it.title,
+        company: it.company,
+        location: it.location ?? null,
+        postingText: (it.description ?? "").slice(0, MAX_TEXT),
+      }));
+
+      const prompt = `You extract REQUIRED years of professional work experience for each job from the posting text (not education duration unless it clearly substitutes for experience).
+
+Input JSON array (one object per job):
+${JSON.stringify(payload)}
+
+Return ONLY a JSON array. One object per input job; each object MUST include the same "key" string as its input row.
+
+Each object shape:
+{ "key": string, "experienceYearsMin": number | null, "experienceYearsMax": number | null }
+
+Rules:
+- Whole years only: integers from 0 to 60, or null.
+- Use null when that bound is not stated or cannot be inferred from the posting.
+- "3+ years", "minimum 3 years", "at least three years", "3 yrs experience" → min=3, max=null
+- "up to 2 years", "maximum 2 years" → min=null, max=2
+- "2–5 years", "2-5 yrs", "between 2 and 5 years" → min=2, max=5
+- "5+ years", "minimum 5+ years experience" → min=5, max=null
+- "0-1 years", "entry level", "new grad" with explicit years → set sensible min/max; if only "entry level" with no years, prefer nulls unless a range is explicit.
+- If the posting does not mention experience/years for the role, return both null.
+- Do not infer numeric years from job title alone when the text does not state them.
+
+No markdown, no commentary.`;
+
+      const result = await model.generateContent(prompt);
+      const raw = result.response.text().trim();
+      const arr = extractJsonArray(raw);
+      if (!arr) {
+        continue;
+      }
+      for (const item of arr) {
+        if (!item || typeof item !== "object") continue;
+        const o = item as Record<string, unknown>;
+        const key = typeof o.key === "string" ? o.key : "";
+        if (!key || !Object.prototype.hasOwnProperty.call(byKey, key)) continue;
+        const lo =
+          o.experienceYearsMin ??
+          o.minYears ??
+          o.yearsMin ??
+          o.minimumYears;
+        const hi =
+          o.experienceYearsMax ??
+          o.maxYears ??
+          o.yearsMax ??
+          o.maximumYears;
+        byKey[key] = normalizeExperienceYearsPair(lo, hi);
+      }
+    }
+    return { ok: true, byKey };
+  } catch (e) {
+    return {
+      ok: false,
+      error: mapGeminiException(e, "Experience extraction failed."),
+    };
+  }
+}

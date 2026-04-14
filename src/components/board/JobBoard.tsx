@@ -112,6 +112,10 @@ export function JobBoard({
   const [tab, setTab] = useState<"all" | "applied" | "pending">("all");
   const [sortBy, setSortBy] = useState<"recent" | "ctc">("recent");
   const [searchQuery, setSearchQuery] = useState("");
+  /** So Gemini retry after error matches the same flow (e.g. redo skips cache). */
+  const ctcEstimateOptsRef = useRef<{ forceRefresh: boolean }>({
+    forceRefresh: false,
+  });
 
   const setBusy = useCallback((id: string, v: boolean) => {
     setBusyIds((m) => ({ ...m, [id]: v }));
@@ -190,51 +194,65 @@ export function JobBoard({
     []
   );
 
-  const handleEstimateCtc = useCallback(async (job: JobDTO) => {
-    setAi({ mode: "ctc", job });
-    setCtcErr(null);
-    if (job.ctc?.trim() && job.ctcRange) {
-      setCtcLoading(false);
-      setCtcText(job.ctc);
-      setCtcRange(job.ctcRange);
-      return;
-    }
-    setCtcLoading(true);
-    setCtcText(null);
-    setCtcRange(null);
-    const r = await estimateCTC(job.role, job.company, job.location);
-    if (!r.ok) {
-      setCtcLoading(false);
-      setCtcErr({ kind: "gemini", error: r.error });
-      return;
-    }
-    if (!r.range) {
-      setCtcLoading(false);
-      setCtcErr({
-        kind: "save",
-        message: "Estimate returned without a valid range.",
+  const handleEstimateCtc = useCallback(
+    async (job: JobDTO, opts?: { forceRefresh?: boolean }) => {
+      const forceRefresh = opts?.forceRefresh === true;
+      ctcEstimateOptsRef.current = { forceRefresh };
+      setAi({ mode: "ctc", job });
+      setCtcErr(null);
+      if (!forceRefresh && job.ctc?.trim() && job.ctcRange) {
+        setCtcLoading(false);
+        setCtcText(job.ctc);
+        setCtcRange(job.ctcRange);
+        return;
+      }
+      setCtcLoading(true);
+      setCtcText(null);
+      setCtcRange(null);
+      const r = await estimateCTC(job.role, job.company, job.location, {
+        inrOnly: true,
       });
-      return;
-    }
-    try {
-      setSaveCtcBusy(true);
-      await persistCtcEstimate(job.id, r.text, r.range);
-      setCtcText(r.text);
-      setCtcRange(r.range);
-    } catch {
-      setCtcErr({
-        kind: "save",
-        message: "Could not persist CTC info for this job.",
-      });
-    } finally {
-      setSaveCtcBusy(false);
-      setCtcLoading(false);
-    }
-  }, [persistCtcEstimate]);
+      if (!r.ok) {
+        setCtcLoading(false);
+        setCtcErr({ kind: "gemini", error: r.error });
+        return;
+      }
+      if (!r.range) {
+        setCtcLoading(false);
+        setCtcErr({
+          kind: "save",
+          message: "Estimate returned without a valid range.",
+        });
+        return;
+      }
+      try {
+        setSaveCtcBusy(true);
+        await persistCtcEstimate(job.id, r.text, r.range);
+        setCtcText(r.text);
+        setCtcRange(r.range);
+      } catch {
+        setCtcErr({
+          kind: "save",
+          message: "Could not persist CTC info for this job.",
+        });
+      } finally {
+        setSaveCtcBusy(false);
+        setCtcLoading(false);
+      }
+    },
+    [persistCtcEstimate]
+  );
 
   const retryEstimateCtc = useCallback(() => {
     if (!ai || ai.mode !== "ctc") return;
-    void handleEstimateCtc(ai.job);
+    void handleEstimateCtc(ai.job, {
+      forceRefresh: ctcEstimateOptsRef.current.forceRefresh,
+    });
+  }, [ai, handleEstimateCtc]);
+
+  const redoEstimateCtc = useCallback(() => {
+    if (!ai || ai.mode !== "ctc") return;
+    void handleEstimateCtc(ai.job, { forceRefresh: true });
   }, [ai, handleEstimateCtc]);
 
   const handleMatchResume = useCallback(async (job: JobDTO) => {
@@ -401,7 +419,9 @@ export function JobBoard({
     let failed = 0;
     for (const job of bulkEligible) {
       try {
-        const r = await estimateCTC(job.role, job.company, job.location);
+        const r = await estimateCTC(job.role, job.company, job.location, {
+          inrOnly: true,
+        });
         if (!r.ok || !r.range) {
           failed += 1;
           continue;
@@ -452,6 +472,16 @@ export function JobBoard({
               className="min-h-[44px] w-full rounded-full border border-white/60 bg-white/45 px-4 py-2.5 text-xs font-semibold text-slate-800 backdrop-blur-xl transition-all duration-300 hover:bg-white/65 active:scale-[0.99] sm:w-auto sm:min-h-0 sm:py-2"
             >
               Close
+            </button>
+            <button
+              type="button"
+              onClick={redoEstimateCtc}
+              disabled={ctcLoading || saveCtcBusy}
+              className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-sky-300/80 bg-sky-500/90 px-4 py-2.5 text-xs font-semibold text-white shadow-sm backdrop-blur-xl transition-all duration-300 hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-h-0 sm:py-2"
+              title="Regenerate INR CTC estimate"
+            >
+              <RefreshCw className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Redo estimate
             </button>
           </div>
         }
