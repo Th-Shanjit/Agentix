@@ -56,22 +56,22 @@ function LoginForm({
   }
 
   return (
-    <div className="relative flex min-h-dvh items-center justify-center bg-[#e0e5ec] px-4 py-12">
+    <div className="relative flex min-h-dvh items-center justify-center bg-[var(--shell-bg)] px-4 py-12">
       <GlassBackground />
       <div className="relative z-10 w-full max-w-md">
         <div className="mb-8 text-center">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
             Agentix
           </p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-100">
             Sign in
           </h1>
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="mt-2 text-sm text-slate-300">
             Google or email link. Your data stays on your account.
           </p>
         </div>
 
-        <div className="rounded-3xl border border-white/60 bg-white/40 p-6 shadow-glass backdrop-blur-2xl transition-all duration-300">
+        <div className="rounded-3xl border border-white/15 bg-[#19181A]/75 p-6 shadow-glass backdrop-blur-2xl transition-all duration-300">
           {noProviders && (
             <p className="rounded-2xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm text-amber-900 backdrop-blur-sm">
               No auth providers are configured. Set{" "}
@@ -93,7 +93,7 @@ function LoginForm({
               type="button"
               disabled={busy}
               onClick={() => void handleGoogleSignIn()}
-              className="mt-4 flex w-full items-center justify-center rounded-full border border-white/60 bg-white/50 py-3 text-sm font-semibold text-slate-900 shadow-sm backdrop-blur-xl transition-all duration-300 hover:bg-white/70 disabled:opacity-60"
+              className="mt-4 flex w-full items-center justify-center rounded-full border border-white/20 bg-white/10 py-3 text-sm font-semibold text-slate-100 shadow-sm backdrop-blur-xl transition-all duration-300 hover:bg-white/20 disabled:opacity-60"
             >
               Continue with Google
             </button>
@@ -101,7 +101,7 @@ function LoginForm({
 
           {emailEnabled && (
             <form onSubmit={handleMagicLink} className="mt-4 space-y-3">
-              <label className="block text-xs font-medium text-slate-600">
+              <label className="block text-xs font-medium text-slate-300">
                 Email magic link
                 <input
                   type="email"
@@ -109,13 +109,13 @@ function LoginForm({
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@company.com"
-                  className="mt-1 w-full rounded-full border border-white/60 bg-white/50 px-4 py-2.5 text-sm text-slate-900 shadow-inner backdrop-blur-xl outline-none transition-all duration-300 placeholder:text-slate-400 focus:border-violet-300/80"
+                  className="mt-1 w-full rounded-full border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-slate-100 shadow-inner backdrop-blur-xl outline-none transition-all duration-300 placeholder:text-slate-400 focus:border-[#A16E83]/80"
                 />
               </label>
               <button
                 type="submit"
                 disabled={busy}
-                className="w-full rounded-full border border-violet-400/40 bg-violet-500/90 py-3 text-sm font-semibold text-white shadow-md backdrop-blur-xl transition-all duration-300 hover:bg-violet-600 disabled:opacity-60"
+                className="w-full rounded-full border border-[#479761]/40 bg-[#479761]/90 py-3 text-sm font-semibold text-white shadow-md backdrop-blur-xl transition-all duration-300 hover:bg-[#3d8254] disabled:opacity-60"
               >
                 {busy ? "Sending link…" : "Email me a link"}
               </button>
@@ -140,7 +140,7 @@ export function LoginClient(props: LoginClientProps) {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-dvh items-center justify-center bg-[#e0e5ec] text-sm text-slate-600">
+        <div className="flex min-h-dvh items-center justify-center bg-[var(--shell-bg)] text-sm text-slate-300">
           Loading…
         </div>
       }

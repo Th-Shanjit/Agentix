@@ -3,7 +3,11 @@
 @tailwind utilities;
 
 :root {
-  --shell-bg: #e0e5ec;
+  --shell-bg: #19181A;
+}
+
+html[data-theme="light"] {
+  --shell-bg: #B19F9E;
 }
 
 html {
@@ -11,11 +15,102 @@ html {
 }
 
 body {
-  @apply min-h-dvh text-slate-800;
+  @apply min-h-dvh text-slate-100;
   background-color: var(--shell-bg);
 }
 
 /* Smooth focus for glass UI */
 *:focus-visible {
-  @apply outline-none ring-2 ring-violet-400/60 ring-offset-2 ring-offset-[#e0e5ec];
+  @apply outline-none ring-2 ring-[#A16E83]/60 ring-offset-2 ring-offset-[#19181A];
+}
+
+html[data-theme="light"] body {
+  color: rgb(30 41 59);
+}
+
+html[data-theme="light"] *:focus-visible {
+  @apply ring-offset-[#B19F9E];
+}
+
+/* Explicit theme tokens for shared shell components (safer than wildcard class overrides). */
+html[data-theme="dark"] {
+  --surface-bg: rgb(25 24 26 / 0.75);
+  --surface-border: rgb(255 255 255 / 0.16);
+  --surface-text: rgb(226 232 240);
+  --surface-muted: rgb(148 163 184);
+}
+
+html[data-theme="light"] {
+  --surface-bg: rgb(255 255 255 / 0.58);
+  --surface-border: rgb(255 255 255 / 0.72);
+  --surface-text: rgb(30 41 59);
+  --surface-muted: rgb(71 85 105);
+}
+
+.surface-card {
+  background-color: var(--surface-bg);
+  border-color: var(--surface-border);
+}
+
+.surface-text {
+  color: var(--surface-text);
+}
+
+.surface-muted {
+  color: var(--surface-muted);
+}
+
+html[data-theme="dark"] .bg-white\/60,
+html[data-theme="dark"] .bg-white\/55,
+html[data-theme="dark"] .bg-white\/50,
+html[data-theme="dark"] .bg-white\/45,
+html[data-theme="dark"] .bg-white\/40,
+html[data-theme="dark"] .bg-white\/35,
+html[data-theme="dark"] .bg-white\/30,
+html[data-theme="dark"] .bg-white\/25,
+html[data-theme="dark"] .bg-white\/20 {
+  background-color: rgb(25 24 26 / 0.68);
+}
+
+html[data-theme="dark"] .border-white\/70,
+html[data-theme="dark"] .border-white\/60,
+html[data-theme="dark"] .border-white\/50 {
+  border-color: rgb(255 255 255 / 0.16);
+}
+
+html[data-theme="dark"] .text-slate-900,
+html[data-theme="dark"] .text-slate-800,
+html[data-theme="dark"] .text-slate-700,
+html[data-theme="dark"] .text-slate-600 {
+  color: rgb(226 232 240);
+}
+
+html[data-theme="dark"] .text-slate-500 {
+  color: rgb(148 163 184);
+}
+
+html[data-theme="dark"] .bg-sky-500\/90 {
+  background-color: rgb(71 151 97 / 0.9);
+}
+
+html[data-theme="dark"] .border-sky-400\/50,
+html[data-theme="dark"] .border-sky-300\/50 {
+  border-color: rgb(71 151 97 / 0.5);
+}
+
+html[data-theme="light"] .bg-\[\#19181A\]\/85,
+html[data-theme="light"] .bg-\[\#19181A\]\/75,
+html[data-theme="light"] .bg-\[\#19181A\]\/70 {
+  background-color: rgb(255 255 255 / 0.6);
+}
+
+html[data-theme="light"] .border-white\/20,
+html[data-theme="light"] .border-white\/15 {
+  border-color: rgb(255 255 255 / 0.72);
+}
+
+html[data-theme="light"] .text-slate-100,
+html[data-theme="light"] .text-slate-200,
+html[data-theme="light"] .text-slate-300 {
+  color: rgb(30 41 59);
 }

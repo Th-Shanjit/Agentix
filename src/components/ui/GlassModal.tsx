@@ -47,35 +47,35 @@ export function GlassModal({
       <button
         type="button"
         aria-label="Close dialog"
-        className="absolute inset-0 bg-slate-900/25 backdrop-blur-sm transition-opacity"
+        className="absolute inset-0 bg-black/45 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
       <div
         className={cn(
-          "relative z-10 max-h-[min(90dvh,720px)] w-full overflow-hidden rounded-3xl border border-white/60 bg-white/45 shadow-glass backdrop-blur-2xl transition-all duration-300",
+          "relative z-10 max-h-[min(90dvh,720px)] w-full overflow-hidden rounded-3xl border border-white/15 bg-[#19181A]/75 shadow-glass backdrop-blur-2xl transition-all duration-300",
           wide ? "max-w-2xl" : "max-w-lg"
         )}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-white/50 px-5 py-4">
+        <div className="flex items-start justify-between gap-3 border-b border-white/15 px-4 py-4 sm:px-5">
           <h2
             id="glass-modal-title"
-            className="text-lg font-semibold tracking-tight text-slate-900"
+            className="text-lg font-semibold tracking-tight text-slate-100"
           >
             {title}
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border border-white/50 bg-white/40 p-2 text-slate-700 backdrop-blur-md transition-all duration-300 hover:bg-white/65"
+            className="rounded-full border border-white/20 bg-white/10 p-2 text-slate-200 backdrop-blur-md transition-all duration-300 hover:bg-white/20"
           >
             <X className="h-4 w-4" strokeWidth={1.75} />
           </button>
         </div>
-        <div className="max-h-[min(70dvh,560px)] overflow-y-auto px-5 py-4 text-sm text-slate-800">
+        <div className="max-h-[min(70dvh,560px)] overflow-y-auto px-4 py-4 text-sm text-slate-200 sm:px-5">
           {children}
         </div>
         {footer && (
-          <div className="border-t border-white/50 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="border-t border-white/15 px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-5">
             {footer}
           </div>
         )}

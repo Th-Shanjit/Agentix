@@ -2,7 +2,6 @@ import { auth } from "@/auth";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { ResumeUpload } from "@/components/profile/ResumeUpload";
 import { ProfileSearchPrefs } from "@/components/profile/ProfileSearchPrefs";
-import { JobsImportUpload } from "@/components/profile/JobsImportUpload";
 import { prisma } from "@/lib/prisma";
 
 export default async function ProfilePage() {
@@ -73,8 +72,6 @@ export default async function ProfilePage() {
           initialRemote={searchRemote}
         />
       )}
-
-      {session?.user?.id && <JobsImportUpload />}
     </div>
   );
 }

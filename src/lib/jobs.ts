@@ -10,11 +10,22 @@ export type JobDTO = {
   ctc: string | null;
   link: string;
   applied: boolean;
-  source: string;
+  appliedAt?: string | null;
+  ctcRange?: {
+    low: number;
+    mid: number;
+    high: number;
+    currency: string;
+    period: "YEARLY" | "MONTHLY";
+    format: "LPA" | "K" | "RAW";
+  } | null;
+  notYetListed?: boolean;
   location?: string | null;
   description?: string | null;
   salaryMin?: number | null;
   salaryMax?: number | null;
+  experienceYearsMin?: number | null;
+  experienceYearsMax?: number | null;
   remotePolicy?: string | null;
 };
 
@@ -31,11 +42,66 @@ export function toJobDTOFromJoin(
     dateDiscovered: jl.postedAt.toISOString(),
     ctc: jl.ctc,
     applied: uj.applied,
-    source: jl.source,
+    appliedAt: uj.appliedAt ? uj.appliedAt.toISOString() : null,
+    ctcRange:
+      jl.rawPayload &&
+      typeof jl.rawPayload === "object" &&
+      !Array.isArray(jl.rawPayload) &&
+      "ctcRange" in (jl.rawPayload as Record<string, unknown>) &&
+      (jl.rawPayload as { ctcRange?: unknown }).ctcRange &&
+      typeof (jl.rawPayload as { ctcRange: unknown }).ctcRange === "object" &&
+      typeof (
+        (jl.rawPayload as { ctcRange: Record<string, unknown> }).ctcRange.low
+      ) === "number" &&
+      typeof (
+        (jl.rawPayload as { ctcRange: Record<string, unknown> }).ctcRange.mid
+      ) === "number" &&
+      typeof (
+        (jl.rawPayload as { ctcRange: Record<string, unknown> }).ctcRange.high
+      ) === "number" &&
+      typeof (
+        (jl.rawPayload as { ctcRange: Record<string, unknown> }).ctcRange
+          .currency
+      ) === "string"
+        ? {
+            low: Number(
+              (jl.rawPayload as { ctcRange: Record<string, unknown> }).ctcRange
+                .low
+            ),
+            mid: Number(
+              (jl.rawPayload as { ctcRange: Record<string, unknown> }).ctcRange
+                .mid
+            ),
+            high: Number(
+              (jl.rawPayload as { ctcRange: Record<string, unknown> }).ctcRange
+                .high
+            ),
+            currency: String(
+              (jl.rawPayload as { ctcRange: Record<string, unknown> }).ctcRange
+                .currency
+            ),
+            period:
+              (jl.rawPayload as { ctcRange: Record<string, unknown> }).ctcRange
+                .period === "MONTHLY"
+                ? "MONTHLY"
+                : "YEARLY",
+            format:
+              (jl.rawPayload as { ctcRange: Record<string, unknown> }).ctcRange
+                .format === "LPA" ||
+              (jl.rawPayload as { ctcRange: Record<string, unknown> }).ctcRange
+                .format === "K"
+                ? (jl.rawPayload as { ctcRange: { format: "LPA" | "K" } })
+                    .ctcRange.format
+                : "RAW",
+          }
+        : null,
+    notYetListed: jl.title === "Not yet listed",
     location: jl.location,
     description: jl.description,
     salaryMin: jl.salaryMin,
     salaryMax: jl.salaryMax,
+    experienceYearsMin: jl.experienceYearsMin,
+    experienceYearsMax: jl.experienceYearsMax,
     remotePolicy: jl.remotePolicy,
   };
 }
@@ -54,11 +120,15 @@ export function toJobDTOFromListing(
     dateDiscovered: listing.postedAt.toISOString(),
     ctc: listing.ctc,
     applied,
-    source: listing.source,
+    appliedAt: null,
+    ctcRange: null,
+    notYetListed: listing.title === "Not yet listed",
     location: listing.location,
     description: listing.description,
     salaryMin: listing.salaryMin,
     salaryMax: listing.salaryMax,
+    experienceYearsMin: listing.experienceYearsMin,
+    experienceYearsMax: listing.experienceYearsMax,
     remotePolicy: listing.remotePolicy,
   };
 }
@@ -72,7 +142,6 @@ export function normalizeJobFromApi(data: unknown): JobDTO | null {
     typeof j.role !== "string" ||
     typeof j.link !== "string" ||
     typeof j.applied !== "boolean" ||
-    typeof j.source !== "string" ||
     typeof j.userId !== "string"
   ) {
     return null;
@@ -114,6 +183,46 @@ export function normalizeJobFromApi(data: unknown): JobDTO | null {
       : typeof j.remotePolicy === "string"
         ? j.remotePolicy
         : null;
+  const experienceYearsMin =
+    typeof j.experienceYearsMin === "number" &&
+    Number.isFinite(j.experienceYearsMin)
+      ? j.experienceYearsMin
+      : null;
+  const experienceYearsMax =
+    typeof j.experienceYearsMax === "number" &&
+    Number.isFinite(j.experienceYearsMax)
+      ? j.experienceYearsMax
+      : null;
+  const appliedAt =
+    typeof j.appliedAt === "string"
+      ? j.appliedAt
+      : j.appliedAt === null || j.appliedAt === undefined
+        ? null
+        : null;
+  const ctcRange: JobDTO["ctcRange"] =
+    j.ctcRange &&
+    typeof j.ctcRange === "object" &&
+    typeof (j.ctcRange as Record<string, unknown>).low === "number" &&
+    typeof (j.ctcRange as Record<string, unknown>).mid === "number" &&
+    typeof (j.ctcRange as Record<string, unknown>).high === "number" &&
+    typeof (j.ctcRange as Record<string, unknown>).currency === "string"
+      ? {
+          low: (j.ctcRange as Record<string, number>).low,
+          mid: (j.ctcRange as Record<string, number>).mid,
+          high: (j.ctcRange as Record<string, number>).high,
+          currency: (j.ctcRange as Record<string, string>).currency,
+          period:
+            (j.ctcRange as Record<string, unknown>).period === "MONTHLY"
+              ? "MONTHLY"
+              : "YEARLY",
+          format:
+            (j.ctcRange as Record<string, unknown>).format === "LPA" ||
+            (j.ctcRange as Record<string, unknown>).format === "K"
+              ? ((j.ctcRange as Record<string, "LPA" | "K">).format ?? "RAW")
+              : "RAW",
+        }
+      : null;
+  const notYetListed = Boolean(j.notYetListed);
   return {
     id: j.id,
     userId: j.userId,
@@ -123,11 +232,15 @@ export function normalizeJobFromApi(data: unknown): JobDTO | null {
     ctc,
     link: j.link,
     applied: j.applied,
-    source: j.source,
+    appliedAt,
+    ctcRange,
+    notYetListed,
     location,
     description,
     salaryMin,
     salaryMax,
+    experienceYearsMin,
+    experienceYearsMax,
     remotePolicy,
   };
 }

@@ -1,17 +1,34 @@
 import type { NextAuthConfig } from "next-auth";
 import Google from "next-auth/providers/google";
 
-const googleConfigured =
-  Boolean(process.env.GOOGLE_CLIENT_ID) &&
-  Boolean(process.env.GOOGLE_CLIENT_SECRET);
+function cleanEnv(value: string | undefined) {
+  if (!value) return "";
+  return value.trim().replace(/^"(.*)"$/, "$1").replace(/^'(.*)'$/, "$1");
+}
+
+function googleCreds() {
+  const clientId = cleanEnv(
+    process.env.GOOGLE_CLIENT_ID ?? process.env.AUTH_GOOGLE_ID
+  );
+  const clientSecret = cleanEnv(
+    process.env.GOOGLE_CLIENT_SECRET ?? process.env.AUTH_GOOGLE_SECRET
+  );
+  return { clientId, clientSecret };
+}
+
+export function isGoogleConfigured() {
+  const { clientId, clientSecret } = googleCreds();
+  return Boolean(clientId) && Boolean(clientSecret);
+}
 
 const providers: NextAuthConfig["providers"] = [];
 
-if (googleConfigured) {
+if (isGoogleConfigured()) {
+  const { clientId, clientSecret } = googleCreds();
   providers.push(
     Google({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId,
+      clientSecret,
       allowDangerousEmailAccountLinking: true,
     })
   );

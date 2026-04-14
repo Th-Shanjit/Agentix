@@ -24,6 +24,71 @@ export type SearchMatchBatchResult =
   | { ok: true; matches: SearchMatchRow[] }
   | { ok: false; error: GeminiError };
 
+export type ImportMappedJob = {
+  company: string;
+  role: string;
+  link: string;
+  source?: string | null;
+  description?: string | null;
+  location?: string | null;
+  remotePolicy?: string | null;
+  ctc?: string | null;
+  dateDiscovered?: string | null;
+};
+
+export type ImportMappingAudit = {
+  field: string;
+  mappedFrom: string;
+  confidence: number;
+  note?: string | null;
+};
+
+export async function rankRoleSimilarity(
+  intendedRole: string,
+  candidateRoles: string[]
+): Promise<
+  | { ok: true; related: string[] }
+  | { ok: false; error: GeminiError }
+> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return {
+      ok: false,
+      error: geminiError("unauthorized", "Sign in to use AI features.", false),
+    };
+  }
+  if (!intendedRole.trim() || candidateRoles.length === 0) {
+    return { ok: true, related: [] };
+  }
+  const prompt = `You are matching equivalent/nearby job titles.
+Intended role: "${intendedRole.trim()}"
+Candidate roles: ${JSON.stringify(candidateRoles)}
+
+Return ONLY a JSON array of candidate role strings that are close enough to consider relevant.
+Include junior/senior/intern/associate variations if they are in same domain.
+No markdown, no explanation.`;
+  try {
+    const model = getGeminiModel();
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().trim();
+    const arr = extractJsonArray(raw);
+    if (!arr) {
+      return { ok: true, related: [] };
+    }
+    const set = new Set(candidateRoles);
+    const related = arr
+      .filter((x): x is string => typeof x === "string")
+      .map((x) => x.trim())
+      .filter((x) => set.has(x));
+    return { ok: true, related };
+  } catch (e) {
+    return {
+      ok: false,
+      error: mapGeminiException(e, "Role similarity matching failed."),
+    };
+  }
+}
+
 function clamp(n: unknown, lo: number, hi: number): number {
   if (typeof n !== "number" || Number.isNaN(n)) return lo;
   return Math.min(hi, Math.max(lo, Math.round(n)));
@@ -161,6 +226,105 @@ If uncertain, still output best-effort numbers.`;
     return {
       ok: false,
       error: mapGeminiException(e, "Match scoring failed."),
+    };
+  }
+}
+
+export async function mapImportRowsWithGemini(
+  rows: Record<string, unknown>[]
+): Promise<
+  | { ok: true; rows: ImportMappedJob[]; audit: ImportMappingAudit[] }
+  | { ok: false; error: GeminiError }
+> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return {
+      ok: false,
+      error: geminiError("unauthorized", "Sign in to use AI features.", false),
+    };
+  }
+  if (!rows.length) return { ok: true, rows: [], audit: [] };
+
+  const sample = rows.slice(0, 80);
+  const prompt = `You normalize uploaded job records from mixed schemas.
+Input is a JSON array of row objects. Keys may vary (for example: companyName, employer, title, job_title, applyUrl, posting_link, etc.).
+
+Return ONLY one JSON object:
+{
+  "rows": [ ...normalized rows... ],
+  "audit": [
+    { "field": "company|role|link|source|description|location|remotePolicy|ctc|dateDiscovered",
+      "mappedFrom": "best source key or expression",
+      "confidence": 0-100,
+      "note": "optional brief note" }
+  ]
+}
+
+Each object in "rows" must use this exact schema:
+{ "company": string, "role": string, "link": string, "source": string | null, "description": string | null, "location": string | null, "remotePolicy": string | null, "ctc": string | null, "dateDiscovered": string | null }
+
+Rules:
+- Map semantically equivalent fields to the schema keys.
+- Keep only rows that clearly have company, role, and link.
+- link must look like a web URL.
+- If missing optional fields, set null.
+- Do not include commentary or markdown.
+
+Rows:
+${JSON.stringify(sample)}`;
+
+  try {
+    const model = getGeminiModel();
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().trim();
+    const obj = extractJsonObject(raw);
+    if (!obj || !Array.isArray(obj.rows)) {
+      return {
+        ok: false,
+        error: geminiError(
+          "parse_error",
+          "Could not map uploaded file structure. Try a cleaner file.",
+          true
+        ),
+      };
+    }
+    const mapped: ImportMappedJob[] = [];
+    for (const item of obj.rows) {
+      if (!item || typeof item !== "object") continue;
+      const o = item as Record<string, unknown>;
+      const company = typeof o.company === "string" ? o.company.trim() : "";
+      const role = typeof o.role === "string" ? o.role.trim() : "";
+      const link = typeof o.link === "string" ? o.link.trim() : "";
+      if (!company || !role || !link || !URL.canParse(link)) continue;
+      mapped.push({
+        company,
+        role,
+        link,
+        source: typeof o.source === "string" ? o.source : null,
+        description: typeof o.description === "string" ? o.description : null,
+        location: typeof o.location === "string" ? o.location : null,
+        remotePolicy: typeof o.remotePolicy === "string" ? o.remotePolicy : null,
+        ctc: typeof o.ctc === "string" ? o.ctc : null,
+        dateDiscovered:
+          typeof o.dateDiscovered === "string" ? o.dateDiscovered : null,
+      });
+    }
+    const audit: ImportMappingAudit[] = Array.isArray(obj.audit)
+      ? obj.audit
+          .filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === "object")
+          .map((x) => ({
+            field: typeof x.field === "string" ? x.field : "unknown",
+            mappedFrom: typeof x.mappedFrom === "string" ? x.mappedFrom : "unknown",
+            confidence: clamp(x.confidence, 0, 100),
+            note: typeof x.note === "string" ? x.note : null,
+          }))
+      : [];
+
+    return { ok: true, rows: mapped, audit };
+  } catch (e) {
+    return {
+      ok: false,
+      error: mapGeminiException(e, "AI mapping failed."),
     };
   }
 }

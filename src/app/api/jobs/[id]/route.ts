@@ -27,6 +27,40 @@ function buildListingPayload(
           ? null
           : String(body.ctc).trim();
   }
+  if (
+    body.ctcRange &&
+    typeof body.ctcRange === "object" &&
+    typeof (body.ctcRange as Record<string, unknown>).low === "number" &&
+    typeof (body.ctcRange as Record<string, unknown>).mid === "number" &&
+    typeof (body.ctcRange as Record<string, unknown>).high === "number" &&
+    typeof (body.ctcRange as Record<string, unknown>).currency === "string"
+  ) {
+    data.rawPayload = {
+      ctcRange: {
+        low: Math.round(
+          Number((body.ctcRange as Record<string, unknown>).low)
+        ),
+        mid: Math.round(
+          Number((body.ctcRange as Record<string, unknown>).mid)
+        ),
+        high: Math.round(
+          Number((body.ctcRange as Record<string, unknown>).high)
+        ),
+        currency: String(
+          (body.ctcRange as Record<string, unknown>).currency
+        ),
+        period:
+          (body.ctcRange as Record<string, unknown>).period === "MONTHLY"
+            ? "MONTHLY"
+            : "YEARLY",
+        format:
+          (body.ctcRange as Record<string, unknown>).format === "LPA" ||
+          (body.ctcRange as Record<string, unknown>).format === "K"
+            ? String((body.ctcRange as Record<string, unknown>).format)
+            : "RAW",
+      },
+    };
+  }
   if (typeof body.source === "string") data.source = body.source.trim();
   if (typeof body.dateDiscovered === "string" && body.dateDiscovered) {
     const parsed = new Date(body.dateDiscovered);
@@ -82,7 +116,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   if (typeof raw.applied === "boolean") {
     await prisma.userJob.update({
       where: { id: uj.id },
-      data: { applied: raw.applied },
+      data: { applied: raw.applied, appliedAt: raw.applied ? new Date() : null },
     });
   }
 

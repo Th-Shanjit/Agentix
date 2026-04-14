@@ -12,7 +12,10 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#e0e5ec",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#19181A" },
+    { media: "(prefers-color-scheme: light)", color: "#B19F9E" },
+  ],
 };
 
 export const metadata: Metadata = {
@@ -29,7 +32,14 @@ export default async function RootLayout({
   const session = await auth();
 
   return (
-    <html lang="en">
+    <html lang="en" data-theme="dark">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('agentix-theme');document.documentElement.dataset.theme=(t==='light'?'light':'dark');}catch(e){document.documentElement.dataset.theme='dark';}})();`,
+          }}
+        />
+      </head>
       <body className={`${inter.variable} touch-manipulation font-sans antialiased`}>
         <Providers session={session}>{children}</Providers>
         <SpeedInsights />

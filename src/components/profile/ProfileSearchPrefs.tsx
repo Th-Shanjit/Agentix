@@ -51,9 +51,9 @@ export function ProfileSearchPrefs({
 
   return (
     <section className="rounded-3xl border border-white/60 bg-white/40 p-6 shadow-glass backdrop-blur-2xl">
-      <h3 className="text-lg font-semibold text-slate-900">Search defaults</h3>
+      <h3 className="text-lg font-semibold text-slate-900">Job preferences</h3>
       <p className="mt-1 text-sm text-slate-600">
-        Optional filters for Search (you can still change them each time).
+        Preferences used when AI filters and tidies imported jobs.
       </p>
       <form onSubmit={onSubmit} className="mt-4 space-y-4">
         <label className="block text-xs font-medium text-slate-600">
@@ -94,7 +94,7 @@ export function ProfileSearchPrefs({
         <button
           type="submit"
           disabled={busy}
-          className="rounded-full border border-violet-400/50 bg-violet-500/90 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-violet-600 disabled:opacity-50"
+          className="rounded-full border border-sky-400/50 bg-sky-500/90 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-600 disabled:opacity-50"
         >
           {busy ? "Saving…" : "Save preferences"}
         </button>

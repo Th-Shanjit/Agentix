@@ -3,7 +3,10 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { canonicalJobUrl, jobDedupeKey } from "@/lib/job-url";
-import { batchSearchMatch } from "@/actions/gemini-job-features";
+import {
+  batchSearchMatch,
+  rankRoleSimilarity,
+} from "@/actions/gemini-job-features";
 import {
   toJobDTOFromJoin,
   type JobDTO,
@@ -19,8 +22,9 @@ export type AddManualJobResult =
 
 export type UploadJobInput = {
   company: string;
-  role: string;
-  link: string;
+  role?: string | null;
+  intendedRole?: string | null;
+  link?: string | null;
   source?: string | null;
   description?: string | null;
   location?: string | null;
@@ -80,17 +84,18 @@ export async function importUploadJobs(data: {
     const company = raw.company?.trim() ?? "";
     const role = raw.role?.trim() ?? "";
     const link = raw.link?.trim() ?? "";
-    if (!company || !role || !link || !URL.canParse(link)) {
+    if (!company) {
       skippedInvalid += 1;
       continue;
     }
-    const dedupe = jobDedupeKey(link);
+    const dedupe = link && URL.canParse(link) ? jobDedupeKey(link) : `company:${company.toLowerCase()}:${role.toLowerCase() || "not-listed"}`;
     if (seen.has(dedupe)) continue;
     seen.add(dedupe);
     unique.push({
       company,
-      role,
-      link,
+      role: role || "Not yet listed",
+      intendedRole: role || null,
+      link: link && URL.canParse(link) ? link : null,
       source: raw.source?.trim() || "Upload",
       description: raw.description?.trim() || null,
       location: raw.location?.trim() || null,
@@ -149,7 +154,7 @@ export async function importUploadJobs(data: {
 
   const matchCandidates = prefsFiltered.map((job, idx) => ({
     id: `upload-${idx}`,
-    title: job.role,
+    title: job.role ?? "Not yet listed",
     company: job.company,
     description: job.description,
   }));
@@ -173,9 +178,58 @@ export async function importUploadJobs(data: {
   );
 
   const savedJobs: JobDTO[] = [];
+  const existingByCompany = await prisma.jobListing.findMany({
+    where: { userJobs: { some: { userId } } },
+    select: { id: true, company: true, title: true },
+  });
+
   for (const job of aiMatchedJobs) {
-    const canonical = canonicalJobUrl(job.link);
-    const dedupeKey = jobDedupeKey(job.link);
+    const intendedRole = job.intendedRole?.trim() || job.role?.trim() || "";
+    const companyExisting = existingByCompany.filter(
+      (r) => r.company.toLowerCase() === job.company.toLowerCase()
+    );
+    if (intendedRole && companyExisting.length > 0) {
+      const related = await rankRoleSimilarity(
+        intendedRole,
+        companyExisting.map((r) => r.title)
+      );
+      if (related.ok && related.related.length > 0) {
+        const relatedRows = companyExisting.filter((r) =>
+          related.related.includes(r.title)
+        );
+        for (const rel of relatedRows) {
+          const uj = await prisma.$transaction(async (tx) => {
+            const relation = await tx.userJob.upsert({
+              where: {
+                userId_jobListingId: { userId, jobListingId: rel.id },
+              },
+              create: {
+                userId,
+                jobListingId: rel.id,
+                applied: false,
+                appliedAt: null,
+                saved: true,
+              },
+              update: { saved: true },
+            });
+            return tx.userJob.findUnique({
+              where: { id: relation.id },
+              include: { jobListing: true },
+            });
+          });
+          if (uj) savedJobs.push(toJobDTOFromJoin(uj));
+        }
+        continue;
+      }
+    }
+
+    const hasLink = Boolean(job.link && URL.canParse(job.link));
+    const canonical = hasLink
+      ? canonicalJobUrl(String(job.link))
+      : `https://placeholder.agentix.local/company/${encodeURIComponent(job.company.toLowerCase())}`;
+    const dedupeKey = hasLink
+      ? jobDedupeKey(String(job.link))
+      : `placeholder:${job.company.toLowerCase()}:${(job.role ?? "not yet listed").toLowerCase()}`;
     const postedAt =
       job.dateDiscovered && !Number.isNaN(new Date(job.dateDiscovered).getTime())
         ? new Date(job.dateDiscovered)
@@ -184,7 +238,7 @@ export async function importUploadJobs(data: {
       const listing = await tx.jobListing.upsert({
         where: { dedupeKey },
         create: {
-          title: job.role,
+          title: (job.role ?? "Not yet listed").trim() || "Not yet listed",
           company: job.company,
           sourceUrl: canonical,
           dedupeKey,
@@ -197,7 +251,7 @@ export async function importUploadJobs(data: {
           remotePolicy: job.remotePolicy,
         },
         update: {
-          title: job.role,
+          title: (job.role ?? "Not yet listed").trim() || "Not yet listed",
           company: job.company,
           sourceUrl: canonical,
           source: job.source || "Upload",
@@ -216,6 +270,7 @@ export async function importUploadJobs(data: {
           userId,
           jobListingId: listing.id,
           applied: false,
+          appliedAt: null,
           saved: true,
         },
         update: { saved: true },
@@ -296,6 +351,7 @@ export async function addManualJob(data: {
           userId,
           jobListingId: listing.id,
           applied: false,
+          appliedAt: null,
           saved: true,
         },
         update: { saved: true },
@@ -346,6 +402,7 @@ export async function saveJobToMyList(jobListingId: string) {
         userId,
         jobListingId,
         applied: false,
+          appliedAt: null,
         saved: true,
       },
       update: { saved: true },
@@ -390,7 +447,7 @@ export async function toggleJobAppliedStatus(
   try {
     const result = await prisma.userJob.updateMany({
       where: { userId, jobListingId },
-      data: { applied },
+      data: { applied, appliedAt: applied ? new Date() : null },
     });
 
     if (result.count === 0) {

@@ -98,9 +98,10 @@ export async function POST(request: Request) {
       userId,
       jobListingId: listing.id,
       applied,
+      appliedAt: applied ? new Date() : null,
       saved: true,
     },
-    update: { applied },
+    update: { applied, appliedAt: applied ? new Date() : null },
   });
 
   const uj = await prisma.userJob.findUnique({

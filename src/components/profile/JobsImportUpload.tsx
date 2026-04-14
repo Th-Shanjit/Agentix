@@ -1,16 +1,21 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { FileUp, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { importUploadJobs, type UploadJobInput } from "@/actions/jobs";
+import {
+  mapImportRowsWithGemini,
+  type ImportMappingAudit,
+} from "@/actions/gemini-job-features";
 import { cn } from "@/lib/cn";
 
 type ParseResult = {
   rows: UploadJobInput[];
   errors: string[];
 };
+
+type GenericRow = Record<string, unknown>;
 
 function readAsText(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -90,6 +95,60 @@ function parseCsv(text: string): ParseResult {
   return { rows, errors };
 }
 
+function mapByKnownKeys(rows: GenericRow[]): UploadJobInput[] {
+  const pick = (obj: GenericRow, keys: string[]) => {
+    for (const key of keys) {
+      const found = Object.keys(obj).find(
+        (k) => k.trim().toLowerCase() === key.toLowerCase()
+      );
+      if (!found) continue;
+      const v = obj[found];
+      if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    return "";
+  };
+  const mapped: UploadJobInput[] = [];
+  for (const row of rows) {
+    const company = pick(row, ["company", "companyname", "employer", "organization"]);
+    const role = pick(row, ["role", "title", "jobtitle", "job_title", "position"]);
+    const link = pick(row, ["link", "url", "applyurl", "apply_url", "joburl", "job_url"]);
+    if (!company || !role || !link) continue;
+    mapped.push({
+      company,
+      role,
+      link,
+      source: pick(row, ["source", "platform"]) || null,
+      description: pick(row, ["description", "jobdescription", "details"]) || null,
+      location: pick(row, ["location", "city", "country"]) || null,
+      remotePolicy: pick(row, ["remotepolicy", "remote", "workmode", "work_mode"]) || null,
+      ctc: pick(row, ["ctc", "salary", "compensation"]) || null,
+      dateDiscovered: pick(row, ["datediscovered", "date", "postedat", "posted_at"]) || null,
+    });
+  }
+  return mapped;
+}
+
+function parseCsvToGenericRows(text: string): { rows: GenericRow[]; errors: string[] } {
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lines.length < 2) {
+    return { rows: [], errors: ["CSV must include a header and at least one row."] };
+  }
+  const header = parseCsvLine(lines[0]);
+  const rows: GenericRow[] = [];
+  for (let i = 1; i < lines.length; i += 1) {
+    const cols = parseCsvLine(lines[i]);
+    const row: GenericRow = {};
+    for (let j = 0; j < header.length; j += 1) {
+      row[header[j]] = cols[j] ?? "";
+    }
+    rows.push(row);
+  }
+  return { rows, errors: [] };
+}
+
 function parseJson(text: string): ParseResult {
   try {
     const parsed: unknown = JSON.parse(text);
@@ -135,11 +194,15 @@ function parseJson(text: string): ParseResult {
   }
 }
 
-export function JobsImportUpload() {
-  const router = useRouter();
+export function JobsImportUpload({
+  onImported,
+}: {
+  onImported?: () => void | Promise<void>;
+}) {
   const [busy, setBusy] = useState(false);
   const [rows, setRows] = useState<UploadJobInput[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
+  const [mappingAudit, setMappingAudit] = useState<ImportMappingAudit[]>([]);
   const [minRelevance, setMinRelevance] = useState("60");
 
   const canImport = rows.length > 0 && !busy;
@@ -149,13 +212,66 @@ export function JobsImportUpload() {
     setBusy(true);
     try {
       const text = await readAsText(file);
-      const result = file.name.toLowerCase().endsWith(".json")
+      const isJson = file.name.toLowerCase().endsWith(".json");
+      const structured = isJson
         ? parseJson(text)
-        : parseCsv(text);
-      setRows(result.rows);
-      setErrors(result.errors);
-      if (result.rows.length > 0) {
-        toast.success(`Parsed ${result.rows.length} jobs from ${file.name}.`);
+        : (() => {
+            const generic = parseCsvToGenericRows(text);
+            const direct = parseCsv(text);
+            if (direct.rows.length > 0) return direct;
+            const fallback = mapByKnownKeys(generic.rows);
+            return { rows: fallback, errors: generic.errors };
+          })();
+
+      let finalRows = structured.rows;
+      const finalErrors = [...structured.errors];
+      let audit: ImportMappingAudit[] = [];
+
+      if (finalRows.length === 0) {
+        const genericRows: GenericRow[] = isJson
+          ? (() => {
+              try {
+                const parsed = JSON.parse(text) as unknown;
+                if (Array.isArray(parsed)) {
+                  return parsed.filter(
+                    (x): x is GenericRow => Boolean(x) && typeof x === "object"
+                  );
+                }
+                if (
+                  parsed &&
+                  typeof parsed === "object" &&
+                  Array.isArray((parsed as { jobs?: unknown }).jobs)
+                ) {
+                  return (parsed as { jobs: unknown[] }).jobs.filter(
+                    (x): x is GenericRow => Boolean(x) && typeof x === "object"
+                  );
+                }
+                return [];
+              } catch {
+                return [];
+              }
+            })()
+          : parseCsvToGenericRows(text).rows;
+
+        if (genericRows.length > 0) {
+          const aiMap = await mapImportRowsWithGemini(genericRows);
+          if (aiMap.ok) {
+            finalRows = aiMap.rows;
+            audit = aiMap.audit;
+            if (aiMap.rows.length > 0) {
+              toast.message("Used AI schema mapping to normalize this file.");
+            }
+          } else {
+            finalErrors.push(aiMap.error.message);
+          }
+        }
+      }
+
+      setRows(finalRows);
+      setErrors(finalErrors);
+      setMappingAudit(audit);
+      if (finalRows.length > 0) {
+        toast.success(`Parsed ${finalRows.length} jobs from ${file.name}.`);
       } else {
         toast.error("No valid jobs found in this file.");
       }
@@ -163,6 +279,7 @@ export function JobsImportUpload() {
       toast.error(e instanceof Error ? e.message : "Could not read upload.");
       setRows([]);
       setErrors(["Could not read file."]);
+      setMappingAudit([]);
     } finally {
       setBusy(false);
     }
@@ -188,7 +305,10 @@ export function JobsImportUpload() {
       }
       setRows([]);
       setErrors([]);
-      router.push("/board?refresh=1");
+      setMappingAudit([]);
+      if (onImported) {
+        await onImported();
+      }
     } finally {
       setBusy(false);
     }
@@ -203,7 +323,7 @@ export function JobsImportUpload() {
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <label
           className={cn(
-            "inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-full border border-white/60 bg-white/50 px-4 py-2.5 text-xs font-semibold text-slate-800 shadow-sm backdrop-blur-xl transition-all duration-300",
+            "inline-flex min-h-[44px] w-full cursor-pointer items-center justify-center gap-2 rounded-full border border-white/60 bg-white/50 px-4 py-2.5 text-xs font-semibold text-slate-800 shadow-sm backdrop-blur-xl transition-all duration-300 sm:w-auto",
             "hover:bg-white/70",
             busy && "cursor-not-allowed opacity-60"
           )}
@@ -235,7 +355,7 @@ export function JobsImportUpload() {
           type="button"
           disabled={!canImport}
           onClick={() => void onImport()}
-          className="inline-flex min-h-[44px] items-center justify-center rounded-full border border-violet-400/50 bg-violet-500/90 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-all duration-300 hover:bg-violet-600 disabled:opacity-50"
+          className="inline-flex min-h-[44px] w-full items-center justify-center rounded-full border border-sky-400/50 bg-sky-500/90 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-all duration-300 hover:bg-sky-600 disabled:opacity-50 sm:w-auto"
         >
           {busy ? "Processing..." : `Import ${rows.length || ""}`.trim()}
         </button>
@@ -247,6 +367,22 @@ export function JobsImportUpload() {
           <ul className="mt-2 space-y-1">
             {sample.map((r) => (
               <li key={`${r.company}-${r.role}-${r.link}`}>{r.role} at {r.company}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {mappingAudit.length > 0 && (
+        <div className="mt-4 rounded-2xl border border-blue-200/80 bg-blue-50/80 p-3 text-xs text-blue-900">
+          <p className="font-semibold">AI mapping report</p>
+          <ul className="mt-2 space-y-1">
+            {mappingAudit.slice(0, 10).map((a, i) => (
+              <li key={`${a.field}-${i}`}>
+                <span className="font-medium">{a.field}</span>:{" "}
+                <span className="font-mono">{a.mappedFrom}</span> (
+                {a.confidence}%)
+                {a.note ? ` - ${a.note}` : ""}
+              </li>
             ))}
           </ul>
         </div>

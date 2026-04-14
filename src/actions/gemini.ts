@@ -15,6 +15,22 @@ function getModel() {
   return getGeminiModel();
 }
 
+function parseRangeNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.max(0, Math.round(value));
+  }
+  if (typeof value !== "string") return null;
+  const raw = value.trim().toUpperCase().replace(/,/g, "");
+  if (!raw) return null;
+  const m = raw.match(/^(\d+(?:\.\d+)?)([KLM])?$/);
+  if (!m) return null;
+  const num = Number.parseFloat(m[1]);
+  if (!Number.isFinite(num)) return null;
+  const unit = m[2] ?? "";
+  const mult = unit === "K" ? 1_000 : unit === "L" ? 100_000 : unit === "M" ? 1_000_000 : 1;
+  return Math.max(0, Math.round(num * mult));
+}
+
 export type AtsMatchResult = {
   matchPercentage: number;
   verdict: string;
@@ -23,7 +39,18 @@ export type AtsMatchResult = {
 };
 
 export type EstimateCTCResult =
-  | { ok: true; text: string }
+  | {
+      ok: true;
+      text: string;
+      range: {
+        low: number;
+        mid: number;
+        high: number;
+        currency: string;
+        period: "YEARLY" | "MONTHLY";
+        format: "LPA" | "K" | "RAW";
+      } | null;
+    }
   | { ok: false; error: GeminiError };
 
 export type MatchResumeATSResult =
@@ -33,7 +60,8 @@ export type MatchResumeATSResult =
 /** Estimate CTC for a role at a company in India (concise). */
 export async function estimateCTC(
   jobRole: string,
-  company: string
+  company: string,
+  location?: string | null
 ): Promise<EstimateCTCResult> {
   const session = await auth();
   if (!session?.user?.id) {
@@ -58,19 +86,85 @@ export async function estimateCTC(
 
   try {
     const model = getModel();
-    const prompt = `Estimate typical annual CTC (total compensation) in INR for the position "${role}" at "${company}" in India.
+    const prompt = `Estimate compensation for role "${role}" at company "${company}".
+Known location/context: "${(location ?? "").trim() || "unknown"}"
 
 Rules:
-- Be concise (under 180 words).
-- Give a reasonable band or range when uncertain.
-- Mention India / location context briefly.
+- Be concise (under 180 words) and explanatory.
+- Choose currency relevant to likely job geography:
+  - Use INR for India-focused roles.
+  - Use local currency for clearly non-India roles (USD, EUR, GBP, SGD, AED, etc.).
+- Choose period based on market convention for that role/location:
+  - "YEARLY" when annual pay is standard.
+  - "MONTHLY" when monthly salary is more natural.
+- Give a reasonable band/range.
 - If public data is unclear, say so and give a qualitative estimate.
-- Do not invent fake citations; you may mention "typical market" language without URLs.
+- Explain the estimate basis (market comps, level, city band, company tier, role family).
+- Include a short "sources considered" note using general source categories (job boards, compensation communities, public salary discussions). No fabricated links.
 
-Respond in plain text only, no JSON.`;
+Return ONLY one JSON object:
+{
+  "summary": "brief CTC explainer text with basis and source categories",
+  "range": {
+    "low": number,
+    "mid": number,
+    "high": number,
+    "currency": "INR|USD|EUR|GBP|SGD|AED|...",
+    "period": "YEARLY|MONTHLY",
+    "format": "LPA|K|RAW"
+  }
+}`;
 
     const result = await model.generateContent(prompt);
-    const text = result.response.text().trim();
+    const raw = result.response.text().trim();
+    const start = raw.indexOf("{");
+    const end = raw.lastIndexOf("}");
+    const parsed =
+      start >= 0 && end > start ? JSON.parse(raw.slice(start, end + 1)) : null;
+    const text =
+      parsed &&
+      typeof parsed === "object" &&
+      typeof (parsed as { summary?: unknown }).summary === "string"
+        ? (parsed as { summary: string }).summary.trim()
+        : "";
+    const rangeRaw =
+      parsed && typeof parsed === "object"
+        ? (parsed as { range?: unknown }).range
+        : null;
+    const low =
+      rangeRaw && typeof rangeRaw === "object"
+        ? parseRangeNumber((rangeRaw as { low?: unknown }).low)
+        : null;
+    const high =
+      rangeRaw && typeof rangeRaw === "object"
+        ? parseRangeNumber((rangeRaw as { high?: unknown }).high)
+        : null;
+    const mid =
+      rangeRaw && typeof rangeRaw === "object"
+        ? parseRangeNumber((rangeRaw as { mid?: unknown }).mid)
+        : null;
+    const range: Extract<EstimateCTCResult, { ok: true }>["range"] =
+      rangeRaw &&
+      typeof rangeRaw === "object" &&
+      typeof (rangeRaw as { currency?: unknown }).currency === "string" &&
+      low != null &&
+      high != null
+        ? {
+            low,
+            mid: mid ?? Math.round((low + high) / 2),
+            high,
+            currency: (rangeRaw as { currency: string }).currency,
+            period:
+              (rangeRaw as { period?: unknown }).period === "MONTHLY"
+                ? "MONTHLY"
+                : "YEARLY",
+            format:
+              (rangeRaw as { format?: unknown }).format === "LPA" ||
+              (rangeRaw as { format?: unknown }).format === "K"
+                ? ((rangeRaw as { format: "LPA" | "K" }).format ?? "RAW")
+                : "RAW",
+          }
+        : null;
     if (!text) {
       return {
         ok: false,
@@ -81,7 +175,7 @@ Respond in plain text only, no JSON.`;
         ),
       };
     }
-    return { ok: true, text };
+    return { ok: true, text, range };
   } catch (e) {
     return {
       ok: false,
@@ -130,7 +224,8 @@ const MAX_RESUME_CHARS = 32000;
 export async function matchResumeATS(
   resumeText: string,
   jobRole: string,
-  company: string
+  company: string,
+  jobDescription?: string
 ): Promise<MatchResumeATSResult> {
   const session = await auth();
   if (!session?.user?.id) {
@@ -176,6 +271,10 @@ export async function matchResumeATS(
     const prompt = `You are an ATS screening engine.
 
 Compare the resume text below to the job: "${role}" at "${company}".
+Job description/context:
+"""
+${(jobDescription ?? "").trim() || "Not provided"}
+"""
 
 Return ONLY a single JSON object (no markdown fences) with exactly these keys:
 - "matchPercentage": number from 0 to 100 (integer)

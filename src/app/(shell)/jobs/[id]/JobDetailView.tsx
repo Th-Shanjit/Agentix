@@ -92,16 +92,10 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <Link
-          href="/search"
-          className="rounded-full border border-white/60 bg-white/40 px-3 py-1.5 font-medium text-slate-700 backdrop-blur-xl hover:bg-white/60"
-        >
-          ← Search
-        </Link>
-        <Link
           href="/board"
           className="rounded-full border border-white/60 bg-white/40 px-3 py-1.5 font-medium text-slate-700 backdrop-blur-xl hover:bg-white/60"
         >
-          My jobs
+          ← My jobs
         </Link>
       </div>
 
@@ -117,7 +111,7 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
             : ""}
         </p>
         {data.listing.ctc && (
-          <p className="mt-2 text-sm font-medium text-violet-900">
+          <p className="mt-2 text-sm font-medium text-sky-900">
             Listed: {data.listing.ctc}
           </p>
         )}
@@ -125,7 +119,7 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
           href={data.listing.sourceUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-4 inline-flex items-center gap-2 rounded-full border border-violet-300/50 bg-violet-500/90 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-violet-600"
+          className="mt-4 inline-flex items-center gap-2 rounded-full border border-sky-300/50 bg-sky-500/90 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-600"
         >
           Open posting
           <ExternalLink className="h-4 w-4" strokeWidth={1.75} />
@@ -214,7 +208,7 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
           <h2 className="text-lg font-semibold text-slate-900">
             Résumé vs role
           </h2>
-          <p className="mt-2 text-3xl font-bold text-violet-900">
+          <p className="mt-2 text-3xl font-bold text-sky-900">
             {data.enrichment.resumeGrade != null
               ? `${Math.round(data.enrichment.resumeGrade)} / 100`
               : "—"}
@@ -264,7 +258,7 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
             disabled={tonesBusy}
             onClick={() => void runTones()}
             className={cn(
-              "inline-flex items-center gap-2 rounded-full border border-violet-400/50 bg-violet-500/90 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-violet-600 disabled:opacity-50"
+              "inline-flex items-center gap-2 rounded-full border border-sky-400/50 bg-sky-500/90 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-600 disabled:opacity-50"
             )}
           >
             {tonesBusy ? (

@@ -1,5 +1,6 @@
 import { LoginClient } from "./LoginClient";
 import { auth } from "@/auth";
+import { isGoogleConfigured } from "@/auth.config";
 import { redirect } from "next/navigation";
 
 export default async function LoginPage({
@@ -16,9 +17,7 @@ export default async function LoginPage({
     redirect(callbackUrl);
   }
 
-  const googleEnabled = Boolean(
-    process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
-  );
+  const googleEnabled = isGoogleConfigured();
   const emailEnabled = Boolean(
     process.env.EMAIL_SERVER && process.env.EMAIL_FROM
   );

@@ -4,6 +4,7 @@ import type { Session } from "next-auth";
 import { SessionProvider } from "next-auth/react";
 import type { ReactNode } from "react";
 import { AppToaster } from "@/components/ui/AppToaster";
+import { ThemeProvider } from "@/components/providers/ThemeProvider";
 
 type ProvidersProps = {
   children: ReactNode;
@@ -13,8 +14,10 @@ type ProvidersProps = {
 export function Providers({ children, session }: ProvidersProps) {
   return (
     <SessionProvider session={session}>
-      {children}
-      <AppToaster />
+      <ThemeProvider>
+        {children}
+        <AppToaster />
+      </ThemeProvider>
     </SessionProvider>
   );
 }
