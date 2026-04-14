@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, LogIn, LogOut, Moon, Sun } from "lucide-react";
+import { signOutAndReload } from "@/lib/auth-client";
 import { cn } from "@/lib/cn";
 import { useTheme } from "@/components/providers/ThemeProvider";
 
 export function TopActions() {
   const { status } = useSession();
   const { theme, toggleTheme } = useTheme();
+  const [signingOut, setSigningOut] = useState(false);
   const [isScrolling, setIsScrolling] = useState(false);
   const [scrollY, setScrollY] = useState(0);
   const hideTimer = useRef<number | null>(null);
@@ -58,11 +60,16 @@ export function TopActions() {
       {status === "authenticated" && (
         <button
           type="button"
-          onClick={() => signOut({ callbackUrl: "/board" })}
-          className="pointer-events-auto inline-flex min-h-[40px] items-center gap-2 rounded-full border border-white/20 bg-[#19181A]/70 px-3 py-2 text-xs font-semibold text-slate-100 shadow-sm backdrop-blur-xl transition-all duration-300 hover:bg-[#19181A]/85"
+          disabled={signingOut}
+          onClick={() => {
+            if (signingOut) return;
+            setSigningOut(true);
+            void signOutAndReload("/board").catch(() => setSigningOut(false));
+          }}
+          className="pointer-events-auto inline-flex min-h-[40px] items-center gap-2 rounded-full border border-white/20 bg-[#19181A]/70 px-3 py-2 text-xs font-semibold text-slate-100 shadow-sm backdrop-blur-xl transition-all duration-300 hover:bg-[#19181A]/85 disabled:cursor-wait disabled:opacity-70"
         >
           <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} />
-          Sign out
+          {signingOut ? "…" : "Sign out"}
         </button>
       )}
       {status === "unauthenticated" && (

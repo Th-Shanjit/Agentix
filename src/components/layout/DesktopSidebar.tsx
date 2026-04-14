@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut, useSession } from "next-auth/react";
+import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { Briefcase, LogOut, UserRound } from "lucide-react";
+import { signOutAndReload } from "@/lib/auth-client";
 import { cn } from "@/lib/cn";
 
 const nav = [
@@ -14,6 +16,7 @@ const nav = [
 export function DesktopSidebar() {
   const pathname = usePathname();
   const { data: session, status } = useSession();
+  const [signingOut, setSigningOut] = useState(false);
 
   const display =
     session?.user?.name ??
@@ -60,19 +63,26 @@ export function DesktopSidebar() {
               <p className="mt-1 line-clamp-2 text-sm font-medium text-slate-100">
                 {display}
               </p>
-              {session?.user?.email && session?.user?.name && (
-                <p className="mt-0.5 line-clamp-2 text-[11px] text-slate-400">
-                  {session.user.email}
-                </p>
-              )}
+              {session?.user?.email &&
+                display &&
+                session.user.email !== display && (
+                  <p className="mt-0.5 line-clamp-2 text-[11px] text-slate-400">
+                    {session.user.email}
+                  </p>
+                )}
             </div>
             <button
               type="button"
-              onClick={() => signOut({ callbackUrl: "/board" })}
-              className="flex w-full items-center justify-center gap-2 rounded-full border border-white/20 bg-white/10 py-2 text-xs font-semibold text-slate-100 backdrop-blur-xl transition-all duration-300 hover:bg-white/20"
+              disabled={signingOut}
+              onClick={() => {
+                if (signingOut) return;
+                setSigningOut(true);
+                void signOutAndReload("/board").catch(() => setSigningOut(false));
+              }}
+              className="flex w-full items-center justify-center gap-2 rounded-full border border-white/20 bg-white/10 py-2 text-xs font-semibold text-slate-100 backdrop-blur-xl transition-all duration-300 hover:bg-white/20 disabled:cursor-wait disabled:opacity-70"
             >
               <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Sign out
+              {signingOut ? "Signing out…" : "Sign out"}
             </button>
           </>
         )}

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSession } from "next-auth/react";
 import { Briefcase, Plus, RefreshCw, Search } from "lucide-react";
 import { toast } from "sonner";
 import { addManualJob, toggleJobAppliedStatus } from "@/actions/jobs";
@@ -86,8 +87,13 @@ export function JobBoard({
   userId,
   autoRefreshOnMount = false,
 }: JobBoardProps) {
+  const { data: session, status: sessionStatus } = useSession();
+  /** Prefer live client session so Add job / imports match sidebar after sign-in without a full reload. */
+  const effectiveUserId = session?.user?.id ?? userId ?? "";
+
   const [jobs, setJobs] = useState<JobDTO[]>(initialJobs);
   const hasAutoRefreshed = useRef(false);
+  const sessionJobsSynced = useRef(false);
 
   useEffect(() => {
     setJobs(initialJobs);
@@ -297,7 +303,7 @@ export function JobBoard({
 
   const handleManualAdd = useCallback(
     async (data: { company: string; role: string; url: string }) => {
-      if (!userId) {
+      if (!effectiveUserId) {
         toast.error("Sign in to add jobs.");
         return;
       }
@@ -305,7 +311,7 @@ export function JobBoard({
       const tempId = `temp-${crypto.randomUUID()}`;
       const optimistic: JobDTO = {
         id: tempId,
-        userId,
+        userId: effectiveUserId,
         company: data.company.trim(),
         role: data.role.trim(),
         link: data.url.trim(),
@@ -337,7 +343,7 @@ export function JobBoard({
         setAddSubmitting(false);
       }
     },
-    [userId]
+    [effectiveUserId]
   );
 
   const refresh = useCallback(async () => {
@@ -359,6 +365,20 @@ export function JobBoard({
       setRefreshing(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (!session?.user?.id) {
+      sessionJobsSynced.current = false;
+    }
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    const sid = session?.user?.id;
+    if (!sid || userId) return;
+    if (sessionJobsSynced.current) return;
+    sessionJobsSynced.current = true;
+    void refresh();
+  }, [session?.user?.id, userId, refresh]);
 
   useEffect(() => {
     if (!autoRefreshOnMount || hasAutoRefreshed.current) return;
@@ -716,7 +736,9 @@ export function JobBoard({
           <button
             type="button"
             onClick={() => setAddOpen(true)}
-            disabled={!userId || addSubmitting}
+            disabled={
+              sessionStatus === "loading" || !effectiveUserId || addSubmitting
+            }
             className={cn(
               "inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-white/60 bg-white/45 px-4 py-2.5 text-xs font-semibold text-slate-800 shadow-sm backdrop-blur-xl transition-all duration-300 sm:w-auto sm:min-h-0 sm:py-2",
               "hover:bg-white/65 disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.99]"
@@ -758,9 +780,12 @@ export function JobBoard({
             <button
               type="button"
               onClick={() => setAddOpen(true)}
+              disabled={
+                sessionStatus === "loading" || !effectiveUserId || addSubmitting
+              }
               className={cn(
                 "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-sky-400/40 bg-sky-500/90 px-5 py-2.5 text-xs font-semibold text-white shadow-md backdrop-blur-xl transition-all duration-300",
-                "hover:bg-sky-600 active:scale-[0.99]"
+                "hover:bg-sky-600 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
               )}
             >
               <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
