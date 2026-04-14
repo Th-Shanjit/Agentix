@@ -45,43 +45,43 @@ export async function addManualJob(data: {
     const canonical = canonicalJobUrl(link);
     const dedupeKey = jobDedupeKey(link);
 
-    const listing = await prisma.jobListing.upsert({
-      where: { dedupeKey },
-      create: {
-        title: role,
-        company,
-        sourceUrl: canonical,
-        dedupeKey,
-        ctc: null,
-        ctcSource: "MANUAL",
-        source: "Manual",
-        postedAt: new Date(),
-      },
-      update: {
-        title: role,
-        company,
-        sourceUrl: canonical,
-      },
-    });
+    const uj = await prisma.$transaction(async (tx) => {
+      const listing = await tx.jobListing.upsert({
+        where: { dedupeKey },
+        create: {
+          title: role,
+          company,
+          sourceUrl: canonical,
+          dedupeKey,
+          ctc: null,
+          ctcSource: "MANUAL",
+          source: "Manual",
+          postedAt: new Date(),
+        },
+        update: {
+          title: role,
+          company,
+          sourceUrl: canonical,
+        },
+      });
 
-    await prisma.userJob.upsert({
-      where: {
-        userId_jobListingId: { userId, jobListingId: listing.id },
-      },
-      create: {
-        userId,
-        jobListingId: listing.id,
-        applied: false,
-        saved: true,
-      },
-      update: {},
-    });
+      const relation = await tx.userJob.upsert({
+        where: {
+          userId_jobListingId: { userId, jobListingId: listing.id },
+        },
+        create: {
+          userId,
+          jobListingId: listing.id,
+          applied: false,
+          saved: true,
+        },
+        update: { saved: true },
+      });
 
-    const uj = await prisma.userJob.findUnique({
-      where: {
-        userId_jobListingId: { userId, jobListingId: listing.id },
-      },
-      include: { jobListing: true },
+      return tx.userJob.findUnique({
+        where: { id: relation.id },
+        include: { jobListing: true },
+      });
     });
 
     if (!uj) {

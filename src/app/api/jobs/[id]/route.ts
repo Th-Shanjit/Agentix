@@ -45,8 +45,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id: jobListingId } = context.params;
-  if (!jobListingId) {
+  const { id } = context.params;
+  if (!id) {
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
   }
 
@@ -63,20 +63,25 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const raw = body as Record<string, unknown>;
 
-  const uj = await prisma.userJob.findFirst({
-    where: { userId, jobListingId },
+  const ujByUserJobId = await prisma.userJob.findFirst({
+    where: { id, userId },
     include: { jobListing: true },
   });
 
-  if (!uj) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+  const ujByListingId = ujByUserJobId
+    ? null
+    : await prisma.userJob.findFirst({
+        where: { userId, jobListingId: id },
+        include: { jobListing: true },
+      });
+
+  const uj = ujByUserJobId ?? ujByListingId;
+  if (!uj) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const jobListingId = uj.jobListingId;
 
   if (typeof raw.applied === "boolean") {
     await prisma.userJob.update({
-      where: {
-        userId_jobListingId: { userId, jobListingId },
-      },
+      where: { id: uj.id },
       data: { applied: raw.applied },
     });
   }
@@ -97,9 +102,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const next = await prisma.userJob.findUnique({
-    where: {
-      userId_jobListingId: { userId, jobListingId },
-    },
+    where: { id: uj.id },
     include: { jobListing: true },
   });
 

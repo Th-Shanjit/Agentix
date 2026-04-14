@@ -68,26 +68,7 @@ export function SearchPanel() {
     setLoading(true);
     try {
       const res = await fetch(`/api/search/jobs?${queryString}`);
-      if (!res.ok) {
-        // #region agent log
-        fetch("http://127.0.0.1:7789/ingest/469f7bf6-046a-4f8e-b523-c0b19a42773e", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Debug-Session-Id": "9c4d2d",
-          },
-          body: JSON.stringify({
-            sessionId: "9c4d2d",
-            hypothesisId: "H3",
-            location: "SearchPanel.tsx:runSearch_notOk",
-            message: "search API non-OK",
-            data: { status: res.status },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
-        throw new Error("Search failed");
-      }
+      if (!res.ok) throw new Error("Search failed");
       const data: unknown = await res.json();
       const j =
         data && typeof data === "object" && "jobs" in data
@@ -95,23 +76,6 @@ export function SearchPanel() {
           : [];
       setJobs(Array.isArray(j) ? j : []);
     } catch {
-      // #region agent log
-      fetch("http://127.0.0.1:7789/ingest/469f7bf6-046a-4f8e-b523-c0b19a42773e", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Debug-Session-Id": "9c4d2d",
-        },
-        body: JSON.stringify({
-          sessionId: "9c4d2d",
-          hypothesisId: "H3",
-          location: "SearchPanel.tsx:runSearch_catch",
-          message: "search fetch threw or non-OK",
-          data: {},
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       toast.error("Could not load results.");
       setJobs([]);
     } finally {

@@ -230,6 +230,9 @@ export function JobBoard({ initialJobs, userId }: JobBoardProps) {
           setJobs((prev) => prev.filter((j) => j.id !== tempId));
           toast.error(result.error);
         }
+      } catch {
+        setJobs((prev) => prev.filter((j) => j.id !== tempId));
+        toast.error("Could not add job.");
       } finally {
         setAddSubmitting(false);
       }
@@ -464,42 +467,26 @@ export function JobBoard({ initialJobs, userId }: JobBoardProps) {
       {empty ? (
         <section className="rounded-3xl border border-dashed border-white/50 bg-white/25 p-10 text-center shadow-inner backdrop-blur-xl">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-white/60 bg-white/45 shadow-inner backdrop-blur-md">
-            <Briefcase
-              className="h-7 w-7 text-violet-700/85"
-              strokeWidth={1.5}
-            />
+            <Briefcase className="h-7 w-7 text-violet-700/85" strokeWidth={1.5} />
           </div>
           <h3 className="mt-4 text-base font-semibold tracking-tight text-slate-900">
-            Your pipeline is empty
+            Your job tracker is empty
           </h3>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-600">
-            Add a job, use Search for the catalog, or send jobs in via the API /
-            webhook.
+            Start building your personal pipeline by adding your first application.
           </p>
           <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-            {userId ? (
-              <button
-                type="button"
-                onClick={() => setAddOpen(true)}
-                className={cn(
-                  "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-violet-400/40 bg-violet-500/90 px-5 py-2.5 text-xs font-semibold text-white shadow-md backdrop-blur-xl transition-all duration-300",
-                  "hover:bg-violet-600 active:scale-[0.99]"
-                )}
-              >
-                <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
-                Add your first job
-              </button>
-            ) : (
-              <p className="text-sm text-slate-500">
-                Sign in to add jobs from the board.
-              </p>
-            )}
-            <p className="text-xs text-slate-500">
-              API:{" "}
-              <code className="rounded-md bg-white/50 px-1.5 py-0.5">
-                POST /api/jobs
-              </code>
-            </p>
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              className={cn(
+                "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-violet-400/40 bg-violet-500/90 px-5 py-2.5 text-xs font-semibold text-white shadow-md backdrop-blur-xl transition-all duration-300",
+                "hover:bg-violet-600 active:scale-[0.99]"
+              )}
+            >
+              <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Add Job Manually
+            </button>
           </div>
         </section>
       ) : (

@@ -10,24 +10,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // #region agent log
-  fetch("http://127.0.0.1:7789/ingest/469f7bf6-046a-4f8e-b523-c0b19a42773e", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Debug-Session-Id": "9c4d2d",
-    },
-    body: JSON.stringify({
-      sessionId: "9c4d2d",
-      hypothesisId: "H3",
-      location: "api/search/jobs/route.ts:GET_entry",
-      message: "search jobs GET",
-      data: { hasUserId: true },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
-
   const { searchParams } = new URL(request.url);
   const q = (searchParams.get("q") ?? "").trim();
   const salaryMin = parseInt(searchParams.get("salaryMin") ?? "", 10);
@@ -100,57 +82,17 @@ export async function GET(request: Request) {
     where.AND = andParts;
   }
 
-  let listings;
-  try {
-    listings = await prisma.jobListing.findMany({
-      where,
-      orderBy: { postedAt: "desc" },
-      take: 100,
-      include: {
-        matchCaches: {
-          where: { userId },
-          take: 1,
-        },
+  const listings = await prisma.jobListing.findMany({
+    where,
+    orderBy: { postedAt: "desc" },
+    take: 100,
+    include: {
+      matchCaches: {
+        where: { userId },
+        take: 1,
       },
-    });
-    // #region agent log
-    fetch("http://127.0.0.1:7789/ingest/469f7bf6-046a-4f8e-b523-c0b19a42773e", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "9c4d2d",
-      },
-      body: JSON.stringify({
-        sessionId: "9c4d2d",
-        hypothesisId: "H3",
-        location: "api/search/jobs/route.ts:afterFindMany",
-        message: "jobListing.findMany ok",
-        data: { count: listings.length },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-  } catch (e) {
-    const err = e as { code?: string };
-    // #region agent log
-    fetch("http://127.0.0.1:7789/ingest/469f7bf6-046a-4f8e-b523-c0b19a42773e", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "9c4d2d",
-      },
-      body: JSON.stringify({
-        sessionId: "9c4d2d",
-        hypothesisId: "H3",
-        location: "api/search/jobs/route.ts:findManyError",
-        message: "jobListing.findMany failed",
-        data: { prismaCode: err.code ?? "unknown" },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-    throw e;
-  }
+    },
+  });
 
   const jobs = listings.map((jl) => {
     const mc = jl.matchCaches[0];
