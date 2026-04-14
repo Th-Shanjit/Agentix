@@ -3,6 +3,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { canonicalJobUrl, jobDedupeKey } from "@/lib/job-url";
+import { batchSearchMatch } from "@/actions/gemini-job-features";
 import {
   toJobDTOFromJoin,
   type JobDTO,
@@ -15,6 +16,228 @@ export type ToggleJobAppliedResult =
 export type AddManualJobResult =
   | { ok: true; job: JobDTO }
   | { ok: false; error: string };
+
+export type UploadJobInput = {
+  company: string;
+  role: string;
+  link: string;
+  source?: string | null;
+  description?: string | null;
+  location?: string | null;
+  remotePolicy?: string | null;
+  ctc?: string | null;
+  dateDiscovered?: string | null;
+};
+
+export type ImportUploadJobsResult =
+  | {
+      ok: true;
+      addedCount: number;
+      aiConsidered: number;
+      aiMatched: number;
+      skippedInvalid: number;
+      jobs: JobDTO[];
+    }
+  | { ok: false; error: string };
+
+const MATCH_CHUNK = 6;
+
+function normalizeForMatch(s: string | null | undefined) {
+  return (s ?? "").trim().toLowerCase();
+}
+
+function allowsRemote(remotePref: string, job: UploadJobInput) {
+  const rp = normalizeForMatch(job.remotePolicy);
+  const loc = normalizeForMatch(job.location);
+  const isRemote = rp.includes("remote") || loc.includes("remote");
+  const isHybrid = rp.includes("hybrid") || loc.includes("hybrid");
+  const isOnsite =
+    rp.includes("onsite") || rp.includes("on-site") || loc.includes("onsite");
+  if (remotePref === "REMOTE_ONLY") return isRemote;
+  if (remotePref === "HYBRID") return isHybrid || isRemote;
+  if (remotePref === "ONSITE") return isOnsite || (!isRemote && !isHybrid);
+  return true;
+}
+
+function allowsCountry(countries: string[], job: UploadJobInput) {
+  if (countries.length === 0) return true;
+  const hay = `${job.location ?? ""} ${job.description ?? ""}`.toLowerCase();
+  return countries.some((c) => hay.includes(c.toLowerCase()));
+}
+
+export async function importUploadJobs(data: {
+  jobs: UploadJobInput[];
+  minRelevance?: number;
+}): Promise<ImportUploadJobsResult> {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return { ok: false, error: "Unauthorized." };
+
+  const unique: UploadJobInput[] = [];
+  const seen = new Set<string>();
+  let skippedInvalid = 0;
+  for (const raw of data.jobs ?? []) {
+    const company = raw.company?.trim() ?? "";
+    const role = raw.role?.trim() ?? "";
+    const link = raw.link?.trim() ?? "";
+    if (!company || !role || !link || !URL.canParse(link)) {
+      skippedInvalid += 1;
+      continue;
+    }
+    const dedupe = jobDedupeKey(link);
+    if (seen.has(dedupe)) continue;
+    seen.add(dedupe);
+    unique.push({
+      company,
+      role,
+      link,
+      source: raw.source?.trim() || "Upload",
+      description: raw.description?.trim() || null,
+      location: raw.location?.trim() || null,
+      remotePolicy: raw.remotePolicy?.trim() || null,
+      ctc: raw.ctc?.trim() || null,
+      dateDiscovered: raw.dateDiscovered?.trim() || null,
+    });
+  }
+
+  if (unique.length === 0) {
+    return {
+      ok: true,
+      addedCount: 0,
+      aiConsidered: 0,
+      aiMatched: 0,
+      skippedInvalid,
+      jobs: [],
+    };
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      resumeText: true,
+      preferredCountries: true,
+      searchRemotePreference: true,
+    },
+  });
+  if (!user?.resumeText?.trim()) {
+    return {
+      ok: false,
+      error: "Upload your resume on Profile before AI filtering imports.",
+    };
+  }
+
+  const minRelevance = Math.min(100, Math.max(0, data.minRelevance ?? 60));
+  const preferredCountries = Array.isArray(user.preferredCountries)
+    ? user.preferredCountries.filter((x): x is string => typeof x === "string")
+    : [];
+  const prefsFiltered = unique.filter(
+    (j) =>
+      allowsRemote(user.searchRemotePreference ?? "ANY", j) &&
+      allowsCountry(preferredCountries, j)
+  );
+
+  if (prefsFiltered.length === 0) {
+    return {
+      ok: true,
+      addedCount: 0,
+      aiConsidered: 0,
+      aiMatched: 0,
+      skippedInvalid,
+      jobs: [],
+    };
+  }
+
+  const matchCandidates = prefsFiltered.map((job, idx) => ({
+    id: `upload-${idx}`,
+    title: job.role,
+    company: job.company,
+    description: job.description,
+  }));
+
+  const allowedTempIds = new Set<string>();
+  for (let i = 0; i < matchCandidates.length; i += MATCH_CHUNK) {
+    const chunk = matchCandidates.slice(i, i + MATCH_CHUNK);
+    const matchResult = await batchSearchMatch(user.resumeText, chunk);
+    if (!matchResult.ok) {
+      return { ok: false, error: matchResult.error.message };
+    }
+    for (const row of matchResult.matches) {
+      if (row.relevanceScore >= minRelevance) {
+        allowedTempIds.add(row.jobId);
+      }
+    }
+  }
+
+  const aiMatchedJobs = prefsFiltered.filter((_, idx) =>
+    allowedTempIds.has(`upload-${idx}`)
+  );
+
+  const savedJobs: JobDTO[] = [];
+  for (const job of aiMatchedJobs) {
+    const canonical = canonicalJobUrl(job.link);
+    const dedupeKey = jobDedupeKey(job.link);
+    const postedAt =
+      job.dateDiscovered && !Number.isNaN(new Date(job.dateDiscovered).getTime())
+        ? new Date(job.dateDiscovered)
+        : new Date();
+    const uj = await prisma.$transaction(async (tx) => {
+      const listing = await tx.jobListing.upsert({
+        where: { dedupeKey },
+        create: {
+          title: job.role,
+          company: job.company,
+          sourceUrl: canonical,
+          dedupeKey,
+          source: job.source || "Upload",
+          ctc: job.ctc,
+          ctcSource: "MANUAL",
+          postedAt,
+          description: job.description,
+          location: job.location,
+          remotePolicy: job.remotePolicy,
+        },
+        update: {
+          title: job.role,
+          company: job.company,
+          sourceUrl: canonical,
+          source: job.source || "Upload",
+          ctc: job.ctc,
+          description: job.description,
+          location: job.location,
+          remotePolicy: job.remotePolicy,
+        },
+      });
+
+      const relation = await tx.userJob.upsert({
+        where: {
+          userId_jobListingId: { userId, jobListingId: listing.id },
+        },
+        create: {
+          userId,
+          jobListingId: listing.id,
+          applied: false,
+          saved: true,
+        },
+        update: { saved: true },
+      });
+
+      return tx.userJob.findUnique({
+        where: { id: relation.id },
+        include: { jobListing: true },
+      });
+    });
+    if (uj) savedJobs.push(toJobDTOFromJoin(uj));
+  }
+
+  return {
+    ok: true,
+    addedCount: savedJobs.length,
+    aiConsidered: prefsFiltered.length,
+    aiMatched: aiMatchedJobs.length,
+    skippedInvalid,
+    jobs: savedJobs,
+  };
+}
 
 export async function addManualJob(data: {
   company: string;
