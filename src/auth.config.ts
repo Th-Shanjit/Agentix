@@ -8,10 +8,14 @@ function cleanEnv(value: string | undefined) {
 
 function googleCreds() {
   const clientId = cleanEnv(
-    process.env.GOOGLE_CLIENT_ID ?? process.env.AUTH_GOOGLE_ID
+    process.env.GOOGLE_CLIENT_ID ??
+      process.env.AUTH_GOOGLE_ID ??
+      process.env.AUTH_GOOGLE_CLIENT_ID
   );
   const clientSecret = cleanEnv(
-    process.env.GOOGLE_CLIENT_SECRET ?? process.env.AUTH_GOOGLE_SECRET
+    process.env.GOOGLE_CLIENT_SECRET ??
+      process.env.AUTH_GOOGLE_SECRET ??
+      process.env.AUTH_GOOGLE_CLIENT_SECRET
   );
   return { clientId, clientSecret };
 }

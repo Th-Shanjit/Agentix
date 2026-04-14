@@ -3,6 +3,9 @@ import { auth } from "@/auth";
 import { isGoogleConfigured } from "@/auth.config";
 import { redirect } from "next/navigation";
 
+/** Always read env at request time (avoids stale “no providers” UI on Vercel). */
+export const dynamic = "force-dynamic";
+
 export default async function LoginPage({
   searchParams,
 }: {
@@ -27,6 +30,7 @@ export default async function LoginPage({
       googleEnabled={googleEnabled}
       emailEnabled={emailEnabled}
       defaultCallbackUrl={callbackUrl}
+      showVercelEnvHint={Boolean(process.env.VERCEL)}
     />
   );
 }

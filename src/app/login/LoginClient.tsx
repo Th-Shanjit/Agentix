@@ -9,12 +9,15 @@ type LoginClientProps = {
   googleEnabled: boolean;
   emailEnabled: boolean;
   defaultCallbackUrl: string;
+  /** True when running on Vercel (shows deploy-specific env instructions). */
+  showVercelEnvHint?: boolean;
 };
 
 function LoginForm({
   googleEnabled,
   emailEnabled,
   defaultCallbackUrl,
+  showVercelEnvHint = false,
 }: LoginClientProps) {
   const searchParams = useSearchParams();
   const callbackRaw = searchParams.get("callbackUrl");
@@ -80,11 +83,23 @@ function LoginForm({
               <code className="rounded bg-white/60 px-1">
                 GOOGLE_CLIENT_SECRET
               </code>{" "}
-              (and optional{" "}
+              (or{" "}
+              <code className="rounded bg-white/60 px-1">AUTH_GOOGLE_ID</code> /{" "}
+              <code className="rounded bg-white/60 px-1">AUTH_GOOGLE_SECRET</code>
+              ) (and optional{" "}
               <code className="rounded bg-white/60 px-1">EMAIL_SERVER</code> /{" "}
               <code className="rounded bg-white/60 px-1">EMAIL_FROM</code>) in{" "}
-              <code className="rounded bg-white/60 px-1">.env.local</code>{" "}
-              (local) or your host env, then restart the dev server.
+              {showVercelEnvHint ? (
+                <>
+                  your Vercel project → Settings → Environment Variables (enable
+                  for Production), then redeploy.
+                </>
+              ) : (
+                <>
+                  <code className="rounded bg-white/60 px-1">.env.local</code>{" "}
+                  (local) or your host env, then restart the dev server.
+                </>
+              )}
             </p>
           )}
 
