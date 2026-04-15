@@ -1,7 +1,7 @@
-import { auth } from "@/auth";
 import { JobBoard } from "@/components/board/JobBoard";
 import { prisma } from "@/lib/prisma";
 import { toJobDTOFromJoin } from "@/lib/jobs";
+import { requireActiveSession } from "@/lib/require-active-session";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +10,7 @@ export default async function BoardPage({
 }: {
   searchParams?: { refresh?: string };
 }) {
-  const session = await auth();
+  const session = await requireActiveSession("/board");
   const userId = session?.user?.id;
   const shouldRefresh = searchParams?.refresh === "1";
 

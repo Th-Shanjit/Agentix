@@ -6,6 +6,7 @@ import { useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import { Briefcase, LogOut, UserRound } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { clearActiveSessionCookie } from "@/lib/browser-session";
 
 const nav = [
   { href: "/board", label: "My jobs", icon: Briefcase },
@@ -76,6 +77,7 @@ export function DesktopSidebar() {
               onClick={() => {
                 if (signingOut) return;
                 setSigningOut(true);
+                clearActiveSessionCookie();
                 void signOut({ callbackUrl: "/login" }).catch(() =>
                   setSigningOut(false)
                 );

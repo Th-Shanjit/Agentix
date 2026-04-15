@@ -1,11 +1,11 @@
-import { auth } from "@/auth";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { ResumeUpload } from "@/components/profile/ResumeUpload";
 import { ProfileSearchPrefs } from "@/components/profile/ProfileSearchPrefs";
 import { prisma } from "@/lib/prisma";
+import { requireActiveSession } from "@/lib/require-active-session";
 
 export default async function ProfilePage() {
-  const session = await auth();
+  const session = await requireActiveSession("/profile");
 
   let initialResumeText: string | null = null;
   let initialBragSheet: string | null = null;

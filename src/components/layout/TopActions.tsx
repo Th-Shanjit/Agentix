@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowDown, ArrowUp, LogIn, LogOut, Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useTheme } from "@/components/providers/ThemeProvider";
+import { clearActiveSessionCookie } from "@/lib/browser-session";
 
 export function TopActions() {
   const { status } = useSession();
@@ -75,6 +76,7 @@ export function TopActions() {
           onClick={() => {
             if (signingOut) return;
             setSigningOut(true);
+            clearActiveSessionCookie();
             void signOut({ callbackUrl: "/login" }).catch(() =>
               setSigningOut(false)
             );

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { GlassBackground } from "@/components/layout/GlassBackground";
+import { setActiveSessionCookie } from "@/lib/browser-session";
 
 type LoginClientProps = {
   defaultCallbackUrl: string;
@@ -37,6 +38,7 @@ function LoginForm({ defaultCallbackUrl }: LoginClientProps) {
         return;
       }
       if (res?.ok) {
+        setActiveSessionCookie();
         window.location.href = callbackUrl;
         return;
       }

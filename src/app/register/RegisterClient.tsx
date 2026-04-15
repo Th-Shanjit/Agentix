@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { registerWithEmailPassword } from "@/actions/auth-register";
 import { GlassBackground } from "@/components/layout/GlassBackground";
+import { setActiveSessionCookie } from "@/lib/browser-session";
 
 export function RegisterClient({ defaultCallbackUrl }: { defaultCallbackUrl: string }) {
   const [email, setEmail] = useState("");
@@ -25,14 +26,26 @@ export function RegisterClient({ defaultCallbackUrl }: { defaultCallbackUrl: str
       const r = await registerWithEmailPassword(email, password);
       if (!r.ok) {
         setMessage(r.error);
+        setBusy(false);
         return;
       }
-      await signIn("credentials", {
+      const res = await signIn("credentials", {
         email: email.trim().toLowerCase(),
         password,
-        callbackUrl: defaultCallbackUrl,
-        redirect: true,
+        redirect: false,
       });
+      if (res?.error) {
+        setMessage("Sign-in failed after registration. Please try logging in.");
+        setBusy(false);
+        return;
+      }
+      if (res?.ok) {
+        setActiveSessionCookie();
+        window.location.href = defaultCallbackUrl;
+        return;
+      }
+      setMessage("Sign-in failed after registration. Please try logging in.");
+      setBusy(false);
     } catch {
       setMessage("Something went wrong. Try again.");
       setBusy(false);
