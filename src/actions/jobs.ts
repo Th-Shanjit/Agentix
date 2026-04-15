@@ -534,7 +534,7 @@ export async function importJobsFromUrls(urls: string[]): Promise<ImportUrlsResu
     return { ok: false, error: "No valid URLs found." };
   }
 
-  const unique = [...new Set(cleaned)].slice(0, 50);
+  const unique = Array.from(new Set(cleaned)).slice(0, 50);
   const notes: string[] = [];
   const jobs: JobDTO[] = [];
   let skippedCount = 0;

@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export const maxDuration = 60;
 
 const DUPLICATE_WINDOW_DAYS = 7;
 const ARCHIVE_AFTER_DAYS = 60;
+
+function toInputJson(
+  value: Prisma.JsonValue
+): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+  return value === null ? Prisma.JsonNull : (value as Prisma.InputJsonValue);
+}
 
 type ListingLite = {
   id: string;
@@ -107,15 +114,15 @@ async function mergeListingIntoCanonical(keepId: string, removeId: string) {
           relevanceScore: cache.relevanceScore,
           fitScore: cache.fitScore,
           upsideScore: cache.upsideScore,
-          strengths: cache.strengths,
-          weaknesses: cache.weaknesses,
+          strengths: toInputJson(cache.strengths),
+          weaknesses: toInputJson(cache.weaknesses),
         },
         update: {
           relevanceScore: cache.relevanceScore,
           fitScore: cache.fitScore,
           upsideScore: cache.upsideScore,
-          strengths: cache.strengths,
-          weaknesses: cache.weaknesses,
+          strengths: toInputJson(cache.strengths),
+          weaknesses: toInputJson(cache.weaknesses),
         },
       });
       await tx.jobMatchCache.delete({ where: { id: cache.id } });
@@ -182,7 +189,7 @@ async function runDataJanitor() {
 
   const groups = groupByExactTitleCompany(activeListings);
   const dedupePairs: { keepId: string; removeId: string }[] = [];
-  for (const arr of groups.values()) {
+  for (const arr of Array.from(groups.values())) {
     if (arr.length < 2) continue;
     dedupePairs.push(...pickDuplicatesByWindow(arr));
   }
