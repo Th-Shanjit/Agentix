@@ -13,7 +13,11 @@ type ProvidersProps = {
 
 export function Providers({ children, session }: ProvidersProps) {
   return (
-    <SessionProvider session={session} refetchOnWindowFocus>
+    <SessionProvider
+      session={session}
+      refetchOnWindowFocus
+      refetchInterval={5 * 60}
+    >
       <ThemeProvider>
         {children}
         <AppToaster />

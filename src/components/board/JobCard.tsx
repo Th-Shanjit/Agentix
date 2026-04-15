@@ -11,6 +11,7 @@ import {
 import { IOSToggle } from "@/components/ui/IOSToggle";
 import type { JobDTO } from "@/lib/jobs";
 import { cn } from "@/lib/cn";
+import { relevanceScoreToLetterGrade } from "@/lib/grades";
 
 type JobCardProps = {
   job: JobDTO;
@@ -84,6 +85,10 @@ export function JobCard({
 }: JobCardProps) {
   const syncPending = Boolean(pendingSync);
   const actionsDisabled = aiBusy || syncPending;
+  const hasRelevance =
+    typeof job.relevanceScore === "number" && Number.isFinite(job.relevanceScore);
+  const scorePct = hasRelevance ? Math.round(job.relevanceScore ?? 0) : null;
+  const grade = hasRelevance ? relevanceScoreToLetterGrade(scorePct ?? 0) : null;
 
   return (
     <article
@@ -175,6 +180,21 @@ export function JobCard({
         </div>
 
         <div className="flex shrink-0 items-center justify-between gap-3 rounded-2xl border border-white/15 bg-white/5 px-4 py-3 backdrop-blur-xl sm:flex-col sm:items-end sm:py-4">
+          <div className="text-right sm:w-full">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              Match
+            </p>
+            <div className="mt-0.5 flex items-center justify-end gap-2">
+              <p className="text-xs font-semibold text-slate-200">
+                {hasRelevance ? `${scorePct}%` : "—"}
+              </p>
+              {grade && (
+                <span className="rounded-full border border-[#CEBC81]/40 bg-[#CEBC81]/20 px-2 py-0.5 text-[10px] font-bold text-[#CEBC81]">
+                  {grade}
+                </span>
+              )}
+            </div>
+          </div>
           <div className="text-right sm:w-full">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
               Applied

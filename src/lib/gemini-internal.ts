@@ -113,5 +113,13 @@ export function getGeminiModel() {
     throw new Error("GEMINI_API_KEY is not configured.");
   }
   const genAI = new GoogleGenerativeAI(key);
-  return genAI.getGenerativeModel({ model: MODEL_FAST });
+  // Prefer native Google Search grounding when this model version supports it.
+  try {
+    return genAI.getGenerativeModel({
+      model: MODEL_FAST,
+      tools: [{ googleSearch: {} }],
+    } as unknown as Parameters<typeof genAI.getGenerativeModel>[0]);
+  } catch {
+    return genAI.getGenerativeModel({ model: MODEL_FAST });
+  }
 }

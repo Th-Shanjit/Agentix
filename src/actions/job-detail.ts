@@ -36,6 +36,8 @@ export type JobDetailPayload = {
     resumeWeaknesses: string[];
     areasToFix: string[];
     fiveToneResumes: unknown;
+    interviewStories: unknown;
+    negotiationStrategy: unknown;
   } | null;
   userJob: { applied: boolean; saved: boolean } | null;
 };
@@ -84,6 +86,8 @@ function buildPayload(
     forumSentiment: unknown;
     resumeAnalysis: unknown;
     fiveToneResumes: unknown;
+    interviewStories: unknown;
+    negotiationStrategy: unknown;
   } | null,
   uj: { applied: boolean; saved: boolean } | null
 ): JobDetailPayload {
@@ -113,6 +117,8 @@ function buildPayload(
           resumeWeaknesses: ra.weaknesses,
           areasToFix: ra.areasToFix,
           fiveToneResumes: enrich.fiveToneResumes,
+          interviewStories: enrich.interviewStories,
+          negotiationStrategy: enrich.negotiationStrategy,
         }
       : null,
     userJob: uj,
@@ -149,7 +155,7 @@ export async function loadJobDetail(
   const [user, uj, enrich] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
-      select: { resumeText: true },
+      select: { resumeText: true, bragSheet: true },
     }),
     prisma.userJob.findUnique({
       where: {
@@ -164,13 +170,17 @@ export async function loadJobDetail(
   let enrichmentRow = enrich;
 
   if (!enrichmentRow || !isFresh(enrichmentRow.updatedAt)) {
-    const r = await enrichJobDetailGemini(user?.resumeText ?? "", {
-      title: listing.title,
-      company: listing.company,
-      location: listing.location,
-      description: listing.description,
-      ctc: listing.ctc,
-    });
+    const r = await enrichJobDetailGemini(
+      user?.resumeText ?? "",
+      user?.bragSheet ?? "",
+      {
+        title: listing.title,
+        company: listing.company,
+        location: listing.location,
+        description: listing.description,
+        ctc: listing.ctc,
+      }
+    );
 
     if (!r.ok) {
       return { ok: false, error: r.error.message };
@@ -190,6 +200,8 @@ export async function loadJobDetail(
           weaknesses: p.resumeWeaknesses,
           areasToFix: p.areasToFix,
         } as object,
+        interviewStories: p.interviewStories as object,
+        negotiationStrategy: p.negotiationStrategy as object,
       },
       update: {
         ctcBands: p.ctcBands as object,
@@ -201,6 +213,8 @@ export async function loadJobDetail(
           weaknesses: p.resumeWeaknesses,
           areasToFix: p.areasToFix,
         } as object,
+        interviewStories: p.interviewStories as object,
+        negotiationStrategy: p.negotiationStrategy as object,
       },
     });
   }

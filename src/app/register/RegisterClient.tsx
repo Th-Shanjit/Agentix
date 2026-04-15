@@ -27,24 +27,14 @@ export function RegisterClient({ defaultCallbackUrl }: { defaultCallbackUrl: str
         setMessage(r.error);
         return;
       }
-      const sign = await signIn("credentials", {
+      await signIn("credentials", {
         email: email.trim().toLowerCase(),
         password,
         callbackUrl: defaultCallbackUrl,
-        redirect: false,
+        redirect: true,
       });
-      if (sign?.error) {
-        setMessage("Account created but sign-in failed. Try logging in.");
-        return;
-      }
-      if (sign?.url) {
-        window.location.href = sign.url;
-        return;
-      }
-      window.location.href = defaultCallbackUrl;
     } catch {
       setMessage("Something went wrong. Try again.");
-    } finally {
       setBusy(false);
     }
   }

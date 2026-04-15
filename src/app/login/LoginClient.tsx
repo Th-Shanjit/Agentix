@@ -33,24 +33,14 @@ function LoginForm({
     setMessage(null);
     setBusy(true);
     try {
-      const r = await signIn("credentials", {
+      await signIn("credentials", {
         email: email.trim().toLowerCase(),
         password,
         callbackUrl,
-        redirect: false,
+        redirect: true,
       });
-      if (r?.error) {
-        setMessage("Invalid email or password.");
-        return;
-      }
-      if (r?.url) {
-        window.location.href = r.url;
-        return;
-      }
-      window.location.href = callbackUrl;
     } catch {
       setMessage("Sign-in failed. Try again.");
-    } finally {
       setBusy(false);
     }
   }

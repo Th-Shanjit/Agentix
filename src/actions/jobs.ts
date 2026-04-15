@@ -3,8 +3,10 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { canonicalJobUrl, jobDedupeKey } from "@/lib/job-url";
+import { load } from "cheerio";
 import {
   batchSearchMatch,
+  extractJobFromScrapeWithGemini,
   extractExperienceYearsBatch,
   rankRoleSimilarity,
 } from "@/actions/gemini-job-features";
@@ -19,6 +21,16 @@ export type ToggleJobAppliedResult =
 
 export type AddManualJobResult =
   | { ok: true; job: JobDTO }
+  | { ok: false; error: string };
+
+export type ImportUrlsResult =
+  | {
+      ok: true;
+      addedCount: number;
+      skippedCount: number;
+      jobs: JobDTO[];
+      notes: string[];
+    }
   | { ok: false; error: string };
 
 export type UploadJobInput = {
@@ -46,6 +58,122 @@ export type ImportUploadJobsResult =
   | { ok: false; error: string };
 
 const MATCH_CHUNK = 6;
+const FETCH_TIMEOUT_MS = 15000;
+
+async function fetchWithTimeout(url: string) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, {
+      method: "GET",
+      redirect: "follow",
+      signal: controller.signal,
+      headers: {
+        "user-agent":
+          "Mozilla/5.0 (compatible; AgentixBot/1.0; +https://agentix.app)",
+      },
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function parseGreenhouse(url: URL): { board: string; jobId: string } | null {
+  const parts = url.pathname.split("/").filter(Boolean);
+  const idx = parts.indexOf("jobs");
+  if (idx <= 0 || idx + 1 >= parts.length) return null;
+  const board = parts[idx - 1];
+  const jobId = parts[idx + 1]?.replace(/\D/g, "") ?? "";
+  return board && jobId ? { board, jobId } : null;
+}
+
+async function tryGreenhouseApi(url: URL): Promise<{
+  ok: true;
+  title: string;
+  company: string;
+  location: string | null;
+  description: string | null;
+} | null> {
+  if (!/greenhouse\.io$/i.test(url.hostname)) return null;
+  const parsed = parseGreenhouse(url);
+  if (!parsed) return null;
+  const apiUrl = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(parsed.board)}/jobs/${encodeURIComponent(parsed.jobId)}`;
+  const res = await fetchWithTimeout(apiUrl);
+  if (!res.ok) return null;
+  const data = (await res.json()) as Record<string, unknown>;
+  const title = typeof data.title === "string" ? data.title.trim() : "";
+  const company = parsed.board.replace(/[-_]+/g, " ").trim();
+  const locRaw =
+    data.location && typeof data.location === "object"
+      ? (data.location as Record<string, unknown>).name
+      : null;
+  const location = typeof locRaw === "string" && locRaw.trim() ? locRaw.trim() : null;
+  const description =
+    typeof data.content === "string"
+      ? load(data.content).text().replace(/\s+/g, " ").trim()
+      : null;
+  if (!title || !company) return null;
+  return { ok: true, title, company, location, description };
+}
+
+function parseLever(url: URL): { company: string; postingId: string } | null {
+  if (!/lever\.co$/i.test(url.hostname)) return null;
+  const parts = url.pathname.split("/").filter(Boolean);
+  if (parts.length < 2) return null;
+  return { company: parts[0], postingId: parts[1] };
+}
+
+async function tryLeverApi(url: URL): Promise<{
+  ok: true;
+  title: string;
+  company: string;
+  location: string | null;
+  description: string | null;
+} | null> {
+  const parsed = parseLever(url);
+  if (!parsed) return null;
+  const apiUrl = `https://api.lever.co/v0/postings/${encodeURIComponent(parsed.company)}/${encodeURIComponent(parsed.postingId)}?mode=json`;
+  const res = await fetchWithTimeout(apiUrl);
+  if (!res.ok) return null;
+  const data = (await res.json()) as Record<string, unknown>;
+  const title = typeof data.text === "string" ? data.text.trim() : "";
+  const company = parsed.company.replace(/[-_]+/g, " ").trim();
+  const categories =
+    data.categories && typeof data.categories === "object"
+      ? (data.categories as Record<string, unknown>)
+      : null;
+  const location =
+    categories && typeof categories.location === "string" && categories.location.trim()
+      ? categories.location.trim()
+      : null;
+  const description =
+    typeof data.descriptionPlain === "string" && data.descriptionPlain.trim()
+      ? data.descriptionPlain.trim()
+      : typeof data.description === "string"
+        ? load(data.description).text().replace(/\s+/g, " ").trim()
+        : null;
+  if (!title || !company) return null;
+  return { ok: true, title, company, location, description };
+}
+
+async function scrapeGenericUrl(url: string) {
+  const res = await fetchWithTimeout(url);
+  if (!res.ok) {
+    throw new Error(`Fetch failed (${res.status})`);
+  }
+  const html = await res.text();
+  const $ = load(html);
+  const titleTag = $("title").first().text().trim();
+  const metaDescription = $('meta[name="description"]').attr("content")?.trim() ?? "";
+  const metaOgTitle = $('meta[property="og:title"]').attr("content")?.trim() ?? "";
+  const bodyText = $("body").text().replace(/\s+/g, " ").trim();
+  return {
+    titleTag,
+    metaDescription,
+    metaOgTitle,
+    bodyText: bodyText.slice(0, 30000),
+  };
+}
 
 function normalizeForMatch(s: string | null | undefined) {
   return (s ?? "").trim().toLowerCase();
@@ -121,6 +249,7 @@ export async function importUploadJobs(data: {
     where: { id: userId },
     select: {
       resumeText: true,
+      bragSheet: true,
       preferredCountries: true,
       searchRemotePreference: true,
     },
@@ -161,29 +290,41 @@ export async function importUploadJobs(data: {
   }));
 
   const allowedTempIds = new Set<string>();
+  const matchByTempId = new Map<
+    string,
+    { relevanceScore: number; archetype: string }
+  >();
   for (let i = 0; i < matchCandidates.length; i += MATCH_CHUNK) {
     const chunk = matchCandidates.slice(i, i + MATCH_CHUNK);
-    const matchResult = await batchSearchMatch(user.resumeText, chunk);
+    const matchResult = await batchSearchMatch(
+      user.resumeText,
+      user.bragSheet ?? "",
+      chunk
+    );
     if (!matchResult.ok) {
       return { ok: false, error: matchResult.error.message };
     }
     for (const row of matchResult.matches) {
+      matchByTempId.set(row.jobId, {
+        relevanceScore: row.relevanceScore,
+        archetype: row.archetype,
+      });
       if (row.relevanceScore >= minRelevance) {
         allowedTempIds.add(row.jobId);
       }
     }
   }
 
-  const aiMatchedJobs = prefsFiltered.filter((_, idx) =>
-    allowedTempIds.has(`upload-${idx}`)
-  );
+  const aiMatchedJobs = prefsFiltered
+    .map((job, idx) => ({ job, tempId: `upload-${idx}` }))
+    .filter((x) => allowedTempIds.has(x.tempId));
 
-  const expInputs = aiMatchedJobs.map((job, idx) => ({
+  const expInputs = aiMatchedJobs.map((item, idx) => ({
     key: `u${idx}`,
-    title: (job.role ?? "Not yet listed").trim() || "Not yet listed",
-    company: job.company,
-    location: job.location,
-    description: job.description,
+    title: (item.job.role ?? "Not yet listed").trim() || "Not yet listed",
+    company: item.job.company,
+    location: item.job.location,
+    description: item.job.description,
   }));
 
   let experienceByKey: Record<
@@ -204,7 +345,8 @@ export async function importUploadJobs(data: {
   });
 
   for (let jobIdx = 0; jobIdx < aiMatchedJobs.length; jobIdx++) {
-    const job = aiMatchedJobs[jobIdx];
+    const job = aiMatchedJobs[jobIdx].job;
+    const matchMeta = matchByTempId.get(aiMatchedJobs[jobIdx].tempId) ?? null;
     const extracted =
       experienceByKey[`u${jobIdx}`] ?? {
         experienceYearsMin: null,
@@ -256,6 +398,25 @@ export async function importUploadJobs(data: {
     const dedupeKey = hasLink
       ? jobDedupeKey(String(job.link))
       : `placeholder:${job.company.toLowerCase()}:${(job.role ?? "not yet listed").toLowerCase()}`;
+    const existingListing = await prisma.jobListing.findUnique({
+      where: { dedupeKey },
+      select: { rawPayload: true },
+    });
+    const existingPayload =
+      existingListing?.rawPayload &&
+      typeof existingListing.rawPayload === "object" &&
+      !Array.isArray(existingListing.rawPayload)
+        ? (existingListing.rawPayload as Record<string, unknown>)
+        : {};
+    const mergedPayload =
+      matchMeta && Number.isFinite(matchMeta.relevanceScore)
+        ? ({
+            ...existingPayload,
+            relevanceScore: Math.round(matchMeta.relevanceScore),
+          } as object)
+        : Object.keys(existingPayload).length > 0
+          ? (existingPayload as object)
+          : undefined;
     const postedAt =
       job.dateDiscovered && !Number.isNaN(new Date(job.dateDiscovered).getTime())
         ? new Date(job.dateDiscovered)
@@ -265,6 +426,7 @@ export async function importUploadJobs(data: {
         where: { dedupeKey },
         create: {
           title: (job.role ?? "Not yet listed").trim() || "Not yet listed",
+          archetype: matchMeta?.archetype ?? null,
           company: job.company,
           sourceUrl: canonical,
           dedupeKey,
@@ -277,9 +439,11 @@ export async function importUploadJobs(data: {
           remotePolicy: job.remotePolicy,
           experienceYearsMin: extracted.experienceYearsMin,
           experienceYearsMax: extracted.experienceYearsMax,
+          rawPayload: mergedPayload,
         },
         update: {
           title: (job.role ?? "Not yet listed").trim() || "Not yet listed",
+          archetype: matchMeta?.archetype ?? null,
           company: job.company,
           sourceUrl: canonical,
           source: job.source || "Upload",
@@ -289,6 +453,7 @@ export async function importUploadJobs(data: {
           remotePolicy: job.remotePolicy,
           experienceYearsMin: extracted.experienceYearsMin,
           experienceYearsMax: extracted.experienceYearsMax,
+          rawPayload: mergedPayload,
         },
       });
 
@@ -350,6 +515,115 @@ export async function importUploadJobs(data: {
     aiMatched: aiMatchedJobs.length,
     skippedInvalid,
     jobs: savedJobs,
+  };
+}
+
+export async function importJobsFromUrls(urls: string[]): Promise<ImportUrlsResult> {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return { ok: false, error: "Unauthorized." };
+  if (!Array.isArray(urls) || urls.length === 0) {
+    return { ok: false, error: "Provide at least one URL." };
+  }
+
+  const cleaned = urls
+    .map((u) => u.trim())
+    .filter(Boolean)
+    .filter((u) => URL.canParse(u));
+  if (cleaned.length === 0) {
+    return { ok: false, error: "No valid URLs found." };
+  }
+
+  const unique = [...new Set(cleaned)].slice(0, 50);
+  const notes: string[] = [];
+  const jobs: JobDTO[] = [];
+  let skippedCount = 0;
+
+  for (const rawUrl of unique) {
+    try {
+      const parsed = new URL(rawUrl);
+      const greenhouse = await tryGreenhouseApi(parsed);
+      const lever = greenhouse ? null : await tryLeverApi(parsed);
+
+      let extracted:
+        | { title: string; company: string; location: string | null; description: string | null }
+        | null = greenhouse ?? lever;
+
+      if (!extracted) {
+        const scraped = await scrapeGenericUrl(rawUrl);
+        const ai = await extractJobFromScrapeWithGemini({
+          url: rawUrl,
+          titleTag: scraped.titleTag,
+          metaDescription: scraped.metaDescription,
+          metaOgTitle: scraped.metaOgTitle,
+          bodyText: scraped.bodyText,
+        });
+        if (!ai.ok) {
+          skippedCount += 1;
+          notes.push(`${rawUrl}: ${ai.error.message}`);
+          continue;
+        }
+        extracted = ai.job;
+      }
+
+      const canonical = canonicalJobUrl(rawUrl);
+      const dedupeKey = jobDedupeKey(rawUrl);
+      const uj = await prisma.$transaction(async (tx) => {
+        const listing = await tx.jobListing.upsert({
+          where: { dedupeKey },
+          create: {
+            title: extracted.title,
+            company: extracted.company,
+            sourceUrl: canonical,
+            dedupeKey,
+            source: "URL Import",
+            description: extracted.description,
+            location: extracted.location,
+            ctcSource: "MANUAL",
+            postedAt: new Date(),
+          },
+          update: {
+            title: extracted.title,
+            company: extracted.company,
+            sourceUrl: canonical,
+            source: "URL Import",
+            description: extracted.description ?? undefined,
+            location: extracted.location ?? undefined,
+          },
+        });
+        const relation = await tx.userJob.upsert({
+          where: {
+            userId_jobListingId: { userId, jobListingId: listing.id },
+          },
+          create: {
+            userId,
+            jobListingId: listing.id,
+            applied: false,
+            appliedAt: null,
+            saved: true,
+          },
+          update: { saved: true },
+        });
+        return tx.userJob.findUnique({
+          where: { id: relation.id },
+          include: { jobListing: true },
+        });
+      });
+      if (uj) jobs.push(toJobDTOFromJoin(uj));
+    } catch (e) {
+      skippedCount += 1;
+      notes.push(
+        `${rawUrl}: ${e instanceof Error ? e.message : "Failed to import URL"}`
+      );
+    }
+  }
+
+  return {
+    ok: true,
+    addedCount: jobs.length,
+    skippedCount,
+    jobs,
+    notes: notes.slice(0, 25),
   };
 }
 

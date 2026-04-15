@@ -40,6 +40,7 @@ model User {
   emailVerified          DateTime?
   image                  String?
   resumeText             String?           @db.Text
+  bragSheet              String?           @db.Text
   yearsExperience        Int?
   preferredCountries     Json?
   preferredRoles         Json?
@@ -100,6 +101,7 @@ model VerificationToken {
 model JobListing {
   id                   String          @id @default(cuid())
   title                String
+  archetype            String?
   company              String
   location             String?
   sourceUrl            String          @unique
@@ -119,6 +121,7 @@ model JobListing {
   experienceYearsMin   Int?
   experienceYearsMax   Int?
   careersUrl           String?
+  archivedAt           DateTime?
   postedAt             DateTime        @default(now())
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
@@ -180,6 +183,8 @@ model JobEnrichment {
   forumSentiment Json?
   resumeAnalysis Json?
   fiveToneResumes Json?
+  interviewStories Json?
+  negotiationStrategy Json?
   updatedAt      DateTime   @updatedAt
 }
 

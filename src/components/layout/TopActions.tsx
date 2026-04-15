@@ -14,10 +14,22 @@ export function TopActions() {
   const [signingOut, setSigningOut] = useState(false);
   const [isScrolling, setIsScrolling] = useState(false);
   const [scrollY, setScrollY] = useState(0);
+  const [scrollMetrics, setScrollMetrics] = useState({
+    docHeight: 0,
+    viewport: 0,
+  });
   const hideTimer = useRef<number | null>(null);
 
   useEffect(() => {
+    const measure = () => {
+      setScrollMetrics({
+        docHeight: document.documentElement.scrollHeight,
+        viewport: window.innerHeight,
+      });
+    };
+
     const onScroll = () => {
+      measure();
       setScrollY(window.scrollY);
       setIsScrolling(true);
       if (hideTimer.current) {
@@ -29,22 +41,22 @@ export function TopActions() {
     };
 
     window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", measure);
+    measure();
     onScroll();
     return () => {
       window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", measure);
       if (hideTimer.current) {
         window.clearTimeout(hideTimer.current);
       }
     };
   }, []);
 
-  const docHeight =
-    typeof document !== "undefined"
-      ? document.documentElement.scrollHeight
-      : 0;
-  const viewport =
-    typeof window !== "undefined" ? window.innerHeight : 0;
-  const midpoint = Math.max(0, (docHeight - viewport) / 2);
+  const midpoint = Math.max(
+    0,
+    (scrollMetrics.docHeight - scrollMetrics.viewport) / 2
+  );
   const goTop = scrollY > midpoint;
 
   function jump() {
@@ -52,7 +64,7 @@ export function TopActions() {
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
-    window.scrollTo({ top: docHeight, behavior: "smooth" });
+    window.scrollTo({ top: scrollMetrics.docHeight, behavior: "smooth" });
   }
 
   return (

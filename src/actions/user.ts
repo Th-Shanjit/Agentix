@@ -31,6 +31,32 @@ export async function saveResumeText(text: string) {
   }
 }
 
+/**
+ * Persist optional brag-sheet text for the signed-in user.
+ * Pass empty string to clear.
+ */
+export async function saveBragSheet(text: string) {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) {
+    return { ok: false as const, error: "Unauthorized." };
+  }
+
+  const trimmed = text.trim();
+  const bragSheet = trimmed.length > 0 ? trimmed : null;
+
+  try {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { bragSheet },
+    });
+    return { ok: true as const };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Could not save brag sheet.";
+    return { ok: false as const, error: msg };
+  }
+}
+
 /** Optional search defaults (years, countries, remote mode). */
 export async function updateSearchPreferences(data: {
   yearsExperience: number | null;

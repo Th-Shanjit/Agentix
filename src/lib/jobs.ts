@@ -6,6 +6,8 @@ export type JobDTO = {
   userId: string;
   company: string;
   role: string;
+  archetype?: string | null;
+  relevanceScore?: number | null;
   dateDiscovered: string;
   ctc: string | null;
   link: string;
@@ -38,6 +40,7 @@ export function toJobDTOFromJoin(
     userId: uj.userId,
     company: jl.company,
     role: jl.title,
+    archetype: jl.archetype,
     link: jl.sourceUrl,
     dateDiscovered: jl.postedAt.toISOString(),
     ctc: jl.ctc,
@@ -95,6 +98,14 @@ export function toJobDTOFromJoin(
                 : "RAW",
           }
         : null,
+    relevanceScore:
+      jl.rawPayload &&
+      typeof jl.rawPayload === "object" &&
+      !Array.isArray(jl.rawPayload) &&
+      typeof (jl.rawPayload as { relevanceScore?: unknown }).relevanceScore ===
+        "number"
+        ? Number((jl.rawPayload as { relevanceScore: number }).relevanceScore)
+        : null,
     notYetListed: jl.title === "Not yet listed",
     location: jl.location,
     description: jl.description,
@@ -116,12 +127,14 @@ export function toJobDTOFromListing(
     userId,
     company: listing.company,
     role: listing.title,
+    archetype: listing.archetype,
     link: listing.sourceUrl,
     dateDiscovered: listing.postedAt.toISOString(),
     ctc: listing.ctc,
     applied,
     appliedAt: null,
     ctcRange: null,
+    relevanceScore: null,
     notYetListed: listing.title === "Not yet listed",
     location: listing.location,
     description: listing.description,
@@ -222,12 +235,24 @@ export function normalizeJobFromApi(data: unknown): JobDTO | null {
               : "RAW",
         }
       : null;
+  const archetype =
+    j.archetype === null || j.archetype === undefined
+      ? null
+      : typeof j.archetype === "string"
+        ? j.archetype
+        : null;
+  const relevanceScore =
+    typeof j.relevanceScore === "number" && Number.isFinite(j.relevanceScore)
+      ? j.relevanceScore
+      : null;
   const notYetListed = Boolean(j.notYetListed);
   return {
     id: j.id,
     userId: j.userId,
     company: j.company,
     role: j.role,
+    archetype,
+    relevanceScore,
     dateDiscovered: date,
     ctc,
     link: j.link,

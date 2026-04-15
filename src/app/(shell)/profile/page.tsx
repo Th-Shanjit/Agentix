@@ -8,6 +8,7 @@ export default async function ProfilePage() {
   const session = await auth();
 
   let initialResumeText: string | null = null;
+  let initialBragSheet: string | null = null;
   let yearsExperience: number | null = null;
   let preferredCountriesStr = "";
   let preferredRolesStr = "";
@@ -19,6 +20,7 @@ export default async function ProfilePage() {
       where: { id: session.user.id },
       select: {
         resumeText: true,
+        bragSheet: true,
         yearsExperience: true,
         preferredCountries: true,
         preferredRoles: true,
@@ -27,6 +29,7 @@ export default async function ProfilePage() {
       },
     });
     initialResumeText = user?.resumeText ?? null;
+    initialBragSheet = user?.bragSheet ?? null;
     yearsExperience = user?.yearsExperience ?? null;
     const pc = user?.preferredCountries;
     if (Array.isArray(pc)) {
@@ -74,7 +77,10 @@ export default async function ProfilePage() {
         )}
       </header>
 
-      <ResumeUpload initialResumeText={initialResumeText} />
+      <ResumeUpload
+        initialResumeText={initialResumeText}
+        initialBragSheet={initialBragSheet}
+      />
 
       {session?.user?.id && (
         <ProfileSearchPrefs

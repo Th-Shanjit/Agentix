@@ -12,7 +12,7 @@ export async function GET() {
   }
 
   const rows = await prisma.userJob.findMany({
-    where: { userId },
+    where: { userId, jobListing: { archivedAt: null } },
     include: { jobListing: true },
     orderBy: { jobListing: { postedAt: "desc" } },
   });

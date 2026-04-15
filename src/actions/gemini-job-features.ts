@@ -13,6 +13,8 @@ const MAX_DESC = 8_000;
 
 export type SearchMatchRow = {
   jobId: string;
+  archetype: string;
+  letterGrade: "A" | "B" | "C" | "D" | "F";
   fitScore: number;
   upsideScore: number;
   relevanceScore: number;
@@ -41,6 +43,13 @@ export type ImportMappingAudit = {
   mappedFrom: string;
   confidence: number;
   note?: string | null;
+};
+
+export type UrlScrapeExtractedJob = {
+  title: string;
+  company: string;
+  location: string | null;
+  description: string | null;
 };
 
 export async function rankRoleSimilarity(
@@ -94,6 +103,14 @@ function clamp(n: unknown, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, Math.round(n)));
 }
 
+const getLetterGrade = (score: number) => {
+  if (score >= 90) return "A"; // Dream role, perfect match
+  if (score >= 80) return "B"; // Strong match, minor gaps
+  if (score >= 70) return "C"; // Stretch role or overqualified
+  if (score >= 60) return "D"; // Major gaps, likely rejection
+  return "F"; // Do not apply
+};
+
 function extractJsonArray(raw: string): unknown[] | null {
   const start = raw.indexOf("[");
   const end = raw.lastIndexOf("]");
@@ -123,6 +140,7 @@ function extractJsonObject(raw: string): Record<string, unknown> | null {
 /** Batch match resume to several listings for search ranking (one model call). */
 export async function batchSearchMatch(
   resumeText: string,
+  bragSheetText: string,
   jobs: {
     id: string;
     title: string;
@@ -154,6 +172,11 @@ export async function batchSearchMatch(
     text.length > MAX_RESUME
       ? text.slice(0, MAX_RESUME) + "\n[truncated…]"
       : text;
+  const bragSheet = bragSheetText.trim()
+    ? bragSheetText.trim().length > MAX_RESUME
+      ? bragSheetText.trim().slice(0, MAX_RESUME) + "\n[truncated…]"
+      : bragSheetText.trim()
+    : "";
 
   const lines = jobs.map((j) => {
     const d = j.description?.trim();
@@ -162,24 +185,39 @@ export async function batchSearchMatch(
     return `- id:${j.id} | ${j.title} at ${j.company}${snippet ? ` | ${snippet}` : ""}`;
   });
 
-  const prompt = `You compare a candidate résumé to several job postings.
+  const prompt = `"You are evaluating a candidate. You are provided with a standard ATS Resume AND a 'Brag Sheet' (a raw list of proof points, metrics, and career highlights).
+CRITICAL RULE: Treat the Brag Sheet as absolute truth. When writing resume variants or interview stories, prioritize injecting the hard numbers and specific project names found in the Brag Sheet over the generic text found in the standard resume."
 
-Résumé:
+You compare a candidate profile to several job postings.
+
+Candidate résumé:
 """
 ${resume}
+"""
+
+Career highlights and proof points (hard stats, wins, outcomes):
+"""
+${bragSheet || "(none provided)"}
 """
 
 Jobs (use exact id strings in output):
 ${lines.join("\n")}
 
+Evaluate each job using these dimensions before scoring:
+1) CV Match: How well does the resume map to the core requirements?
+2) Gap Mitigation: What is missing, and can it be learned quickly?
+3) Level Strategy: Is the candidate too senior or junior for this specific listing?
+
 Return ONLY a JSON array (no markdown). Each element must have:
 - "jobId": string (exact id from input)
+- "archetype": string (pick one concise category, e.g. "Software Engineering", "Product", "Design", "Sales", "LLMOps")
 - "fitScore": number 0-100 (how well the résumé fits the role today)
 - "upsideScore": number 0-100 (potential to raise fit with reasonable changes)
-- "relevanceScore": number 0-100 (blend of fit + upside for ranking)
+- "relevanceScore": number 0-100 (final decision score combining CV Match, Gap Mitigation, and Level Strategy)
 - "strengths": string[] (2-4 short bullets)
 - "weaknesses": string[] (2-4 short gaps vs the role)
 
+Use the career highlights as high-signal evidence when present.
 If uncertain, still output best-effort numbers.`;
 
   try {
@@ -205,17 +243,24 @@ If uncertain, still output best-effort numbers.`;
       const o = item as Record<string, unknown>;
       const jobId = typeof o.jobId === "string" ? o.jobId : "";
       if (!want.has(jobId)) continue;
+      const archetype =
+        typeof o.archetype === "string" && o.archetype.trim()
+          ? o.archetype.trim().slice(0, 80)
+          : "General";
       const strengths = Array.isArray(o.strengths)
         ? o.strengths.filter((x): x is string => typeof x === "string").slice(0, 6)
         : [];
       const weaknesses = Array.isArray(o.weaknesses)
         ? o.weaknesses.filter((x): x is string => typeof x === "string").slice(0, 6)
         : [];
+      const relevanceScore = clamp(o.relevanceScore, 0, 100);
       matches.push({
         jobId,
+        archetype,
+        letterGrade: getLetterGrade(relevanceScore),
         fitScore: clamp(o.fitScore, 0, 100),
         upsideScore: clamp(o.upsideScore, 0, 100),
-        relevanceScore: clamp(o.relevanceScore, 0, 100),
+        relevanceScore,
         strengths,
         weaknesses,
       });
@@ -258,6 +303,89 @@ Return ONLY one JSON object:
       "confidence": 0-100,
       "note": "optional brief note" }
   ]
+}
+
+export async function extractJobFromScrapeWithGemini(input: {
+  url: string;
+  titleTag: string;
+  metaDescription: string;
+  metaOgTitle: string;
+  bodyText: string;
+}): Promise<
+  | { ok: true; job: UrlScrapeExtractedJob }
+  | { ok: false; error: GeminiError }
+> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return {
+      ok: false,
+      error: geminiError("unauthorized", "Sign in to use AI features.", false),
+    };
+  }
+
+  const prompt = `Extract structured job fields from scraped page text.
+URL: ${input.url}
+HTML <title>: ${input.titleTag || "(none)"}
+meta description: ${input.metaDescription || "(none)"}
+meta og:title: ${input.metaOgTitle || "(none)"}
+body excerpt:
+"""
+${input.bodyText.slice(0, 12000)}
+"""
+
+Return ONLY one JSON object with this exact shape:
+{ "title": string, "company": string, "location": string | null, "description": string | null }
+
+Rules:
+- title: job role title only, not company name or marketing text.
+- company: employer/company name.
+- location: short location string or null.
+- description: concise plain-text summary of role requirements and responsibilities.
+- If uncertain, return best effort with non-empty title/company when possible.
+- No markdown, no commentary.`;
+
+  try {
+    const model = getGeminiModel();
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().trim();
+    const obj = extractJsonObject(raw);
+    if (!obj) {
+      return {
+        ok: false,
+        error: geminiError(
+          "parse_error",
+          "Could not parse extracted job fields.",
+          true
+        ),
+      };
+    }
+    const title = typeof obj.title === "string" ? obj.title.trim() : "";
+    const company = typeof obj.company === "string" ? obj.company.trim() : "";
+    const location =
+      typeof obj.location === "string" && obj.location.trim()
+        ? obj.location.trim()
+        : null;
+    const description =
+      typeof obj.description === "string" && obj.description.trim()
+        ? obj.description.trim()
+        : null;
+    if (!title || !company) {
+      return {
+        ok: false,
+        error: geminiError(
+          "parse_error",
+          "Could not extract a valid title/company from this URL.",
+          true
+        ),
+      };
+    }
+    return { ok: true, job: { title, company, location, description } };
+  } catch (e) {
+    return {
+      ok: false,
+      error: mapGeminiException(e, "URL extraction failed."),
+    };
+  }
 }
 
 Each object in "rows" must use this exact schema:
@@ -351,6 +479,17 @@ export type JobEnrichmentPayload = {
   resumeStrengths: string[];
   resumeWeaknesses: string[];
   areasToFix: string[];
+  interviewStories: {
+    title: string;
+    situation: string;
+    task: string;
+    action: string;
+    result: string;
+  }[];
+  negotiationStrategy: {
+    scenario: string;
+    script: string;
+  }[];
 };
 
 export type JobEnrichmentGeminiResult =
@@ -359,6 +498,7 @@ export type JobEnrichmentGeminiResult =
 
 export async function enrichJobDetailGemini(
   resumeText: string,
+  bragSheetText: string,
   job: {
     title: string;
     company: string;
@@ -380,6 +520,11 @@ export async function enrichJobDetailGemini(
       ? resumeText.trim().slice(0, MAX_RESUME) + "\n[truncated…]"
       : resumeText.trim()
     : "";
+  const bragSheet = bragSheetText.trim()
+    ? bragSheetText.trim().length > MAX_RESUME
+      ? bragSheetText.trim().slice(0, MAX_RESUME) + "\n[truncated…]"
+      : bragSheetText.trim()
+    : "";
 
   const desc = job.description?.trim();
   const jd =
@@ -387,7 +532,16 @@ export async function enrichJobDetailGemini(
       ? desc.slice(0, MAX_DESC) + "…"
       : desc ?? "";
 
-  const prompt = `You help a job seeker. Use general knowledge and careful language — do NOT claim you scraped Glassdoor or any site. Summaries are illustrative only.
+  const prompt = `"You are evaluating a candidate. You are provided with a standard ATS Resume AND a 'Brag Sheet' (a raw list of proof points, metrics, and career highlights).
+CRITICAL RULE: Treat the Brag Sheet as absolute truth. When writing resume variants or interview stories, prioritize injecting the hard numbers and specific project names found in the Brag Sheet over the generic text found in the standard resume."
+
+You help a job seeker and you can use live web search.
+Actively search the web before answering. Ground your outputs in current information from multiple sources.
+Specifically look for:
+- company's recent news (last 6-12 months),
+- company ratings and review trends from Glassdoor/AmbitionBox or similar,
+- live salary benchmarks for this role/location from levels.fyi and comparable salary sites.
+If evidence is sparse, be explicit in uncertainty and use conservative ranges.
 
 Job: ${job.title} at ${job.company}
 Location: ${job.location ?? "unknown"}
@@ -402,14 +556,38 @@ Candidate résumé (may be empty):
 ${resume || "(none — still give CTC band estimate and skip deep resume grade)"}
 """
 
+Career highlights and proof points (hard stats, wins, outcomes):
+"""
+${bragSheet || "(none provided)"}
+"""
+
+Use the highlights as concrete evidence when evaluating fit and crafting tailored recommendations.
+
 Return ONLY one JSON object (no markdown) with keys:
 - "ctcBands": { "low": number, "mid": number, "high": number, "currency": string (e.g. USD or INR), "credibilityNote": string (1-2 sentences on uncertainty) }
-- "ratingsWeb": { "glassdoorSummary": string (public perception style, not a real score unless you clearly say estimate), "ambitionBoxSummary": string, "disclaimer": string (must say estimates / not verified) }
+- "ratingsWeb": { "glassdoorSummary": string (include useful rating/context signals found online), "ambitionBoxSummary": string, "disclaimer": string }
 - "forumSentiment": { "summary": string (1-3 sentences), "label": string (e.g. Mixed), "disclaimer": string }
 - "resumeGrade": number 0-100 (0 if no résumé)
 - "resumeStrengths": string[]
 - "resumeWeaknesses": string[]
-- "areasToFix": string[] (actionable bullets)`;
+- "areasToFix": string[] (actionable bullets)
+- "interviewStories": array of exactly 5 objects, each:
+  { "title": string, "situation": string, "task": string, "action": string, "result": string }
+  (STAR format; use realistic evidence from resume/highlights and align each story to the role)
+- "negotiationStrategy": array of exactly 3 objects, each:
+  { "scenario": string, "script": string }
+  (tactical salary/offer negotiation scripts or emails, including handling pushback and using estimated CTC context)
+
+"Based on the candidate's resume and brag sheet, generate 5 behavioral interview stories tailored specifically to the requirements of this job description. 
+Format each story strictly using the STAR+R method:
+- Situation: Context of the project.
+- Task: The specific problem to solve.
+- Action: What the candidate actually did (highlighting skills relevant to THIS job).
+- Result: The measurable impact.
+- Reflection: What was learned.
+Return this as a JSON array of objects."
+
+No markdown, no commentary.`;
 
   try {
     const model = getGeminiModel();
@@ -472,6 +650,36 @@ Return ONLY one JSON object (no markdown) with keys:
         : [],
       areasToFix: Array.isArray(o.areasToFix)
         ? o.areasToFix.filter((x): x is string => typeof x === "string")
+        : [],
+      interviewStories: Array.isArray(o.interviewStories)
+        ? o.interviewStories
+            .filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === "object")
+            .map((x) => ({
+              title: typeof x.title === "string" ? x.title : "",
+              situation: typeof x.situation === "string" ? x.situation : "",
+              task: typeof x.task === "string" ? x.task : "",
+              action: typeof x.action === "string" ? x.action : "",
+              result: typeof x.result === "string" ? x.result : "",
+            }))
+            .filter(
+              (x) =>
+                x.title.trim() &&
+                x.situation.trim() &&
+                x.task.trim() &&
+                x.action.trim() &&
+                x.result.trim()
+            )
+            .slice(0, 5)
+        : [],
+      negotiationStrategy: Array.isArray(o.negotiationStrategy)
+        ? o.negotiationStrategy
+            .filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === "object")
+            .map((x) => ({
+              scenario: typeof x.scenario === "string" ? x.scenario : "",
+              script: typeof x.script === "string" ? x.script : "",
+            }))
+            .filter((x) => x.scenario.trim() && x.script.trim())
+            .slice(0, 3)
         : [],
     };
 

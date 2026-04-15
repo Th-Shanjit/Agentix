@@ -1,0 +1,5 @@
+CRITICAL ARCHITECTURE RULES FOR AGENTIX:
+1. NO LOCAL FILES: We never save data to .md, .tsv, or .yml files. All data must be saved to our Vercel Postgres database using Prisma.
+2. NO CLAUDE: We use Google Gemini (`gemini-3-flash-preview` or `gemini-2.5-flash`) via the Google Generative AI SDK on the server-side. Do not write prompts for Anthropic/Claude.
+3. SCORING TRANSLATION: If implementing a letter-grade system (A, B, C, D, F), it must be mathematically mapped from our existing 0-100 `relevanceScore` (e.g., A = 90-100, B = 80-89, etc.). Do not change the database to store letters.
+4. SERVERLESS LIMITS: Do not use Playwright or heavy headless browsers for background jobs, as they will time out on Vercel Serverless functions. Use lightweight APIs (Greenhouse/Lever JSON endpoints), Cheerio, or client-side processing where necessary.

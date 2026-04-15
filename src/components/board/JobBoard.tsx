@@ -16,11 +16,13 @@ import { GeminiErrorCallout } from "./GeminiErrorCallout";
 import { AddJobModal } from "./AddJobModal";
 import { JobCard } from "./JobCard";
 import { JobsImportUpload } from "@/components/profile/JobsImportUpload";
+import { BulkUrlImporter } from "@/components/board/BulkUrlImporter";
 import { GlassModal } from "@/components/ui/GlassModal";
 import { RadialScore } from "./RadialScore";
 import type { JobDTO } from "@/lib/jobs";
 import { normalizeJobFromApi } from "@/lib/jobs";
 import { cn } from "@/lib/cn";
+import { relevanceScoreToLetterGrade } from "@/lib/grades";
 
 type JobBoardProps = {
   initialJobs: JobDTO[];
@@ -118,6 +120,7 @@ export function JobBoard({
   const [tab, setTab] = useState<"all" | "applied" | "pending">("all");
   const [sortBy, setSortBy] = useState<"recent" | "ctc">("recent");
   const [searchQuery, setSearchQuery] = useState("");
+  const [ruthlessMode, setRuthlessMode] = useState(false);
   /** So Gemini retry after error matches the same flow (e.g. redo skips cache). */
   const ctcEstimateOptsRef = useRef<{ forceRefresh: boolean }>({
     forceRefresh: false,
@@ -414,13 +417,26 @@ export function JobBoard({
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return sorted;
-    return sorted.filter((j) => {
-      const hay =
-        `${j.role} ${j.company} ${j.location ?? ""} ${j.description ?? ""}`.toLowerCase();
-      return hay.includes(q);
-    });
-  }, [searchQuery, sorted]);
+    const searched = !q
+      ? sorted
+      : sorted.filter((j) => {
+          const hay =
+            `${j.role} ${j.company} ${j.location ?? ""} ${j.description ?? ""} ${j.archetype ?? ""}`.toLowerCase();
+          return hay.includes(q);
+        });
+    return ruthlessMode
+      ? searched.filter((j) => {
+          if (
+            typeof j.relevanceScore !== "number" ||
+            !Number.isFinite(j.relevanceScore)
+          ) {
+            return true;
+          }
+          const grade = relevanceScoreToLetterGrade(Math.round(j.relevanceScore));
+          return grade === "A" || grade === "B";
+        })
+      : searched;
+  }, [ruthlessMode, searchQuery, sorted]);
 
   const empty = filtered.length === 0;
   const bulkEligible = sorted.filter(
@@ -656,6 +672,7 @@ export function JobBoard({
       />
 
       <JobsImportUpload onImported={refresh} />
+      <BulkUrlImporter onImported={refresh} />
 
       <div className="relative">
         <Search
@@ -727,6 +744,18 @@ export function JobBoard({
             )}
           >
             {bulkEstimating ? "Estimating all..." : "Estimate all CTC"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setRuthlessMode((v) => !v)}
+            className={cn(
+              "min-h-[40px] rounded-full border px-3 py-1.5 text-xs font-semibold",
+              ruthlessMode
+                ? "border-[#A16E83]/70 bg-[#A16E83]/90 text-white"
+                : "border-white/60 bg-white/45 text-slate-700"
+            )}
+          >
+            Ruthless Mode (Hide &lt; B Grade)
           </button>
         </div>
       </div>

@@ -16,7 +16,7 @@ export default async function BoardPage({
 
   const rows = userId
     ? await prisma.userJob.findMany({
-        where: { userId },
+        where: { userId, jobListing: { archivedAt: null } },
         include: { jobListing: true },
         orderBy: { jobListing: { postedAt: "desc" } },
       })
