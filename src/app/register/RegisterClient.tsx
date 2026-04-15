@@ -66,7 +66,7 @@ export function RegisterClient({ defaultCallbackUrl }: { defaultCallbackUrl: str
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@company.com"
-                className="mt-1 w-full rounded-full border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-slate-100 shadow-inner backdrop-blur-xl outline-none transition-all duration-300 placeholder:text-slate-400 focus:border-[#A16E83]/80"
+                className="mt-1 w-full rounded-full border border-white/20 bg-white/10 px-4 py-3 text-base text-slate-100 shadow-inner backdrop-blur-xl outline-none transition-all duration-300 placeholder:text-slate-400 focus:border-[#A16E83]/80"
               />
             </label>
             <label className="block text-xs font-medium text-slate-300">
@@ -78,7 +78,7 @@ export function RegisterClient({ defaultCallbackUrl }: { defaultCallbackUrl: str
                 minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 w-full rounded-full border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-slate-100 shadow-inner backdrop-blur-xl outline-none transition-all duration-300 placeholder:text-slate-400 focus:border-[#A16E83]/80"
+                className="mt-1 w-full rounded-full border border-white/20 bg-white/10 px-4 py-3 text-base text-slate-100 shadow-inner backdrop-blur-xl outline-none transition-all duration-300 placeholder:text-slate-400 focus:border-[#A16E83]/80"
               />
             </label>
             <label className="block text-xs font-medium text-slate-300">
@@ -90,13 +90,13 @@ export function RegisterClient({ defaultCallbackUrl }: { defaultCallbackUrl: str
                 minLength={8}
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
-                className="mt-1 w-full rounded-full border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-slate-100 shadow-inner backdrop-blur-xl outline-none transition-all duration-300 placeholder:text-slate-400 focus:border-[#A16E83]/80"
+                className="mt-1 w-full rounded-full border border-white/20 bg-white/10 px-4 py-3 text-base text-slate-100 shadow-inner backdrop-blur-xl outline-none transition-all duration-300 placeholder:text-slate-400 focus:border-[#A16E83]/80"
               />
             </label>
             <button
               type="submit"
               disabled={busy}
-              className="mt-2 w-full rounded-full border border-[#479761]/40 bg-[#479761]/90 py-3 text-sm font-semibold text-white shadow-md backdrop-blur-xl transition-all duration-300 hover:bg-[#3d8254] disabled:opacity-60"
+              className="mt-2 min-h-[48px] w-full rounded-full border border-[#479761]/40 bg-[#479761]/90 py-3 text-base font-semibold text-white shadow-md backdrop-blur-xl transition-all duration-300 hover:bg-[#3d8254] active:scale-[0.98] disabled:opacity-60"
             >
               {busy ? "Creating…" : "Create account"}
             </button>

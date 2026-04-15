@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, LogIn, LogOut, Moon, Sun } from "lucide-react";
-import { signOutAndReload } from "@/lib/auth-client";
 import { cn } from "@/lib/cn";
 import { useTheme } from "@/components/providers/ThemeProvider";
 
@@ -76,9 +75,11 @@ export function TopActions() {
           onClick={() => {
             if (signingOut) return;
             setSigningOut(true);
-            void signOutAndReload("/board").catch(() => setSigningOut(false));
+            void signOut({ callbackUrl: "/login" }).catch(() =>
+              setSigningOut(false)
+            );
           }}
-          className="pointer-events-auto inline-flex min-h-[40px] items-center gap-2 rounded-full border border-white/20 bg-[#19181A]/70 px-3 py-2 text-xs font-semibold text-slate-100 shadow-sm backdrop-blur-xl transition-all duration-300 hover:bg-[#19181A]/85 disabled:cursor-wait disabled:opacity-70"
+          className="pointer-events-auto inline-flex min-h-[44px] items-center gap-2 rounded-full border border-white/20 bg-[#19181A]/70 px-4 py-2.5 text-xs font-semibold text-slate-100 shadow-sm backdrop-blur-xl transition-all duration-300 hover:bg-[#19181A]/85 active:scale-[0.97] disabled:cursor-wait disabled:opacity-70"
         >
           <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} />
           {signingOut ? "…" : "Sign out"}
@@ -87,7 +88,7 @@ export function TopActions() {
       {status === "unauthenticated" && (
         <Link
           href="/login"
-          className="pointer-events-auto inline-flex min-h-[40px] items-center gap-2 rounded-full border border-[#479761]/50 bg-[#479761]/90 px-3 py-2 text-xs font-semibold text-white shadow-sm backdrop-blur-xl transition-all duration-300 hover:bg-[#3d8254]"
+          className="pointer-events-auto inline-flex min-h-[44px] items-center gap-2 rounded-full border border-[#479761]/50 bg-[#479761]/90 px-4 py-2.5 text-xs font-semibold text-white shadow-sm backdrop-blur-xl transition-all duration-300 hover:bg-[#3d8254] active:scale-[0.97]"
         >
           <LogIn className="h-3.5 w-3.5" strokeWidth={1.75} />
           Sign in
@@ -97,7 +98,7 @@ export function TopActions() {
         type="button"
         onClick={toggleTheme}
         aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-        className="pointer-events-auto inline-flex min-h-[40px] items-center gap-2 rounded-full border border-white/20 bg-[#19181A]/70 px-3 py-2 text-xs font-semibold text-slate-100 shadow-sm backdrop-blur-xl transition-all duration-300 hover:bg-[#19181A]/85"
+        className="pointer-events-auto inline-flex min-h-[44px] items-center gap-2 rounded-full border border-white/20 bg-[#19181A]/70 px-4 py-2.5 text-xs font-semibold text-slate-100 shadow-sm backdrop-blur-xl transition-all duration-300 hover:bg-[#19181A]/85 active:scale-[0.97]"
       >
         {theme === "dark" ? (
           <Sun className="h-3.5 w-3.5" strokeWidth={1.75} />
@@ -111,7 +112,7 @@ export function TopActions() {
         onClick={jump}
         aria-label={goTop ? "Scroll to top" : "Scroll to bottom"}
         className={cn(
-          "pointer-events-auto inline-flex min-h-[40px] items-center gap-1.5 rounded-full border border-[#479761]/50 bg-[#479761]/90 px-3 py-2 text-xs font-semibold text-white shadow-sm backdrop-blur-xl transition-all duration-300 hover:bg-[#3d8254]",
+          "pointer-events-auto inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-[#479761]/50 bg-[#479761]/90 px-4 py-2.5 text-xs font-semibold text-white shadow-sm backdrop-blur-xl transition-all duration-300 hover:bg-[#3d8254] active:scale-[0.97]",
           isScrolling ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0 pointer-events-none"
         )}
       >

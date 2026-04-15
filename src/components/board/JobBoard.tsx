@@ -575,7 +575,7 @@ export function JobBoard({
                   onChange={(e) => setJdInput(e.target.value)}
                   rows={4}
                   placeholder="Paste role summary if posting has no description."
-                  className="mt-1 w-full rounded-2xl border border-white/60 bg-white/40 px-3 py-2 text-xs text-slate-800"
+                  className="mt-1 w-full rounded-2xl border border-white/60 bg-white/40 px-3 py-2.5 text-base text-slate-800 sm:text-sm"
                 />
               </label>
             )}
@@ -683,17 +683,17 @@ export function JobBoard({
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Quick search listings..."
-          className="w-full rounded-2xl border border-white/60 bg-white/45 py-2.5 pl-9 pr-3 text-sm text-slate-900 shadow-sm backdrop-blur-xl placeholder:text-slate-500"
+          className="w-full rounded-2xl border border-white/60 bg-white/45 py-3 pl-9 pr-3 text-base text-slate-900 shadow-sm backdrop-blur-xl placeholder:text-slate-500 sm:py-2.5 sm:text-sm"
         />
       </div>
 
-      <div className="-mx-1 overflow-x-auto px-1">
+      <div className="-mx-1 overflow-x-auto px-1 scrollbar-none">
         <div className="flex min-w-max items-center gap-2 pb-1">
           <button
             type="button"
             onClick={() => setTab("all")}
             className={cn(
-              "min-h-[40px] rounded-full border px-3 py-1.5 text-xs font-semibold",
+              "min-h-[44px] rounded-full border px-4 py-2 text-sm font-semibold active:scale-[0.97]",
               tab === "all"
                 ? "border-sky-400/50 bg-sky-500/90 text-white"
                 : "border-white/60 bg-white/45 text-slate-700"
@@ -705,7 +705,7 @@ export function JobBoard({
             type="button"
             onClick={() => setTab("applied")}
             className={cn(
-              "min-h-[40px] rounded-full border px-3 py-1.5 text-xs font-semibold",
+              "min-h-[44px] rounded-full border px-4 py-2 text-sm font-semibold active:scale-[0.97]",
               tab === "applied"
                 ? "border-sky-400/50 bg-sky-500/90 text-white"
                 : "border-white/60 bg-white/45 text-slate-700"
@@ -717,7 +717,7 @@ export function JobBoard({
             type="button"
             onClick={() => setTab("pending")}
             className={cn(
-              "min-h-[40px] rounded-full border px-3 py-1.5 text-xs font-semibold",
+              "min-h-[44px] rounded-full border px-4 py-2 text-sm font-semibold active:scale-[0.97]",
               tab === "pending"
                 ? "border-sky-400/50 bg-sky-500/90 text-white"
                 : "border-white/60 bg-white/45 text-slate-700"
@@ -728,7 +728,7 @@ export function JobBoard({
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value === "ctc" ? "ctc" : "recent")}
-            className="min-h-[40px] rounded-full border border-white/60 bg-white/45 px-3 py-1.5 text-xs font-semibold text-slate-700"
+            className="min-h-[44px] rounded-full border border-white/60 bg-white/45 px-4 py-2 text-sm font-semibold text-slate-700"
           >
             <option value="recent">Sort: Recent</option>
             <option value="ctc">Sort: CTC estimate</option>
@@ -738,7 +738,7 @@ export function JobBoard({
             onClick={() => void estimateAllVisibleCtc()}
             disabled={aiBusy || bulkEligible.length === 0}
             className={cn(
-              "min-h-[40px] rounded-full border px-3 py-1.5 text-xs font-semibold",
+              "min-h-[44px] rounded-full border px-4 py-2 text-sm font-semibold active:scale-[0.97]",
               "border-sky-400/50 bg-sky-500/90 text-white",
               "disabled:cursor-not-allowed disabled:opacity-50"
             )}
@@ -749,7 +749,7 @@ export function JobBoard({
             type="button"
             onClick={() => setRuthlessMode((v) => !v)}
             className={cn(
-              "min-h-[40px] rounded-full border px-3 py-1.5 text-xs font-semibold",
+              "min-h-[44px] rounded-full border px-4 py-2 text-sm font-semibold active:scale-[0.97]",
               ruthlessMode
                 ? "border-[#A16E83]/70 bg-[#A16E83]/90 text-white"
                 : "border-white/60 bg-white/45 text-slate-700"

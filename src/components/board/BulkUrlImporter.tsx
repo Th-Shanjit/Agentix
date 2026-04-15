@@ -56,7 +56,7 @@ export function BulkUrlImporter({ onImported }: BulkUrlImporterProps) {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="https://boards.greenhouse.io/company/jobs/12345&#10;https://jobs.lever.co/company/abc123"
-        className="mt-4 min-h-36 w-full rounded-2xl border border-white/60 bg-white/50 p-3 text-sm text-slate-900 shadow-inner backdrop-blur-md placeholder:text-slate-500"
+        className="mt-4 min-h-36 w-full rounded-2xl border border-white/60 bg-white/50 p-3 text-base text-slate-900 shadow-inner backdrop-blur-md placeholder:text-slate-500 sm:text-sm"
       />
       <div className="mt-3 flex items-center justify-between gap-2">
         <p className="text-xs text-slate-600">

@@ -242,7 +242,7 @@ export function ResumeUpload({
               type="button"
               onClick={() => saveCareerHighlights()}
               disabled={savingBragSheet || !hasBragSheetChanges}
-              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-white/60 bg-white/45 px-3 py-1.5 text-xs font-semibold text-slate-800 backdrop-blur-xl transition-all duration-300 hover:bg-white/65 disabled:opacity-50"
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-white/60 bg-white/45 px-4 py-2 text-sm font-semibold text-slate-800 backdrop-blur-xl transition-all duration-300 hover:bg-white/65 active:scale-[0.97] disabled:opacity-50"
             >
               {savingBragSheet ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.75} />
@@ -254,7 +254,7 @@ export function ResumeUpload({
             value={bragSheetDraft}
             onChange={(e) => setBragSheetDraft(e.target.value)}
             placeholder="Example: Increased pipeline coverage from 68% to 97%; cut onboarding time by 35%; shipped 3 features adopted by 120k users."
-            className="mt-3 min-h-44 w-full rounded-2xl border border-white/55 bg-white/35 p-3 text-sm text-slate-900 shadow-inner backdrop-blur-md outline-none transition-all duration-200 placeholder:text-slate-500 focus:border-sky-300/70 focus:ring-2 focus:ring-sky-200/40"
+            className="mt-3 min-h-44 w-full rounded-2xl border border-white/55 bg-white/35 p-3 text-base text-slate-900 shadow-inner backdrop-blur-md outline-none transition-all duration-200 placeholder:text-slate-500 focus:border-sky-300/70 focus:ring-2 focus:ring-sky-200/40 sm:text-sm"
           />
           <p className="mt-2 text-right text-xs text-slate-600">
             {bragSheetDraft.trim().length.toLocaleString()} characters
@@ -293,7 +293,7 @@ export function ResumeUpload({
               type="button"
               onClick={() => clear()}
               disabled={busy}
-              className="inline-flex items-center gap-1.5 rounded-full border border-white/60 bg-white/45 px-3 py-1.5 text-xs font-semibold text-slate-800 backdrop-blur-xl transition-all duration-300 hover:bg-white/65 disabled:opacity-50"
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-white/60 bg-white/45 px-4 py-2 text-xs font-semibold text-slate-800 backdrop-blur-xl transition-all duration-300 hover:bg-white/65 active:scale-[0.97] disabled:opacity-50"
             >
               <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
               Clear

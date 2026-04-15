@@ -89,7 +89,7 @@ export function AddJobModal({
             onChange={(e) => setCompany(e.target.value)}
             required
             disabled={busy}
-            className="mt-1.5 w-full rounded-2xl border border-white/60 bg-white/40 px-3 py-2.5 text-sm text-slate-900 shadow-inner backdrop-blur-md placeholder:text-slate-400 focus:border-sky-400/50 focus:outline-none focus:ring-2 focus:ring-sky-400/25 disabled:opacity-60"
+            className="mt-1.5 w-full rounded-2xl border border-white/60 bg-white/40 px-3 py-3 text-base text-slate-900 shadow-inner backdrop-blur-md placeholder:text-slate-400 focus:border-sky-400/50 focus:outline-none focus:ring-2 focus:ring-sky-400/25 disabled:opacity-60 sm:py-2.5 sm:text-sm"
             placeholder="Acme Corp"
           />
         </div>
@@ -109,7 +109,7 @@ export function AddJobModal({
             onChange={(e) => setRole(e.target.value)}
             required
             disabled={busy}
-            className="mt-1.5 w-full rounded-2xl border border-white/60 bg-white/40 px-3 py-2.5 text-sm text-slate-900 shadow-inner backdrop-blur-md placeholder:text-slate-400 focus:border-sky-400/50 focus:outline-none focus:ring-2 focus:ring-sky-400/25 disabled:opacity-60"
+            className="mt-1.5 w-full rounded-2xl border border-white/60 bg-white/40 px-3 py-3 text-base text-slate-900 shadow-inner backdrop-blur-md placeholder:text-slate-400 focus:border-sky-400/50 focus:outline-none focus:ring-2 focus:ring-sky-400/25 disabled:opacity-60 sm:py-2.5 sm:text-sm"
             placeholder="Senior Engineer"
           />
         </div>
@@ -129,7 +129,7 @@ export function AddJobModal({
             onChange={(e) => setUrl(e.target.value)}
             required
             disabled={busy}
-            className="mt-1.5 w-full rounded-2xl border border-white/60 bg-white/40 px-3 py-2.5 text-sm text-slate-900 shadow-inner backdrop-blur-md placeholder:text-slate-400 focus:border-sky-400/50 focus:outline-none focus:ring-2 focus:ring-sky-400/25 disabled:opacity-60"
+            className="mt-1.5 w-full rounded-2xl border border-white/60 bg-white/40 px-3 py-3 text-base text-slate-900 shadow-inner backdrop-blur-md placeholder:text-slate-400 focus:border-sky-400/50 focus:outline-none focus:ring-2 focus:ring-sky-400/25 disabled:opacity-60 sm:py-2.5 sm:text-sm"
             placeholder="https://…"
           />
         </div>

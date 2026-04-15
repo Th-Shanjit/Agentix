@@ -66,7 +66,7 @@ export function GlassModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border border-white/20 bg-white/10 p-2 text-slate-200 backdrop-blur-md transition-all duration-300 hover:bg-white/20"
+            className="rounded-full border border-white/20 bg-white/10 p-2.5 text-slate-200 backdrop-blur-md transition-all duration-300 hover:bg-white/20 active:scale-[0.95]"
           >
             <X className="h-4 w-4" strokeWidth={1.75} />
           </button>

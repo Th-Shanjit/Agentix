@@ -174,13 +174,13 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <Link
           href="/board"
-          className="rounded-full border border-white/60 bg-white/40 px-3 py-1.5 font-medium text-slate-700 backdrop-blur-xl hover:bg-white/60"
+          className="inline-flex min-h-[44px] items-center rounded-full border border-white/60 bg-white/40 px-4 py-2 font-medium text-slate-700 backdrop-blur-xl hover:bg-white/60 active:scale-[0.97]"
         >
           ← My jobs
         </Link>
       </div>
 
-      <header className="rounded-3xl border border-white/60 bg-white/40 p-6 shadow-glass backdrop-blur-2xl">
+      <header className="rounded-3xl border border-white/60 bg-white/40 p-4 shadow-glass backdrop-blur-2xl sm:p-6">
         <h1 className="text-2xl font-semibold text-slate-900">
           {data.listing.title}
         </h1>
@@ -200,7 +200,7 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
           href={data.listing.sourceUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-4 inline-flex items-center gap-2 rounded-full border border-sky-300/50 bg-sky-500/90 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-600"
+          className="mt-4 inline-flex min-h-[44px] items-center gap-2 rounded-full border border-sky-300/50 bg-sky-500/90 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-600 active:scale-[0.97]"
         >
           Open posting
           <ExternalLink className="h-4 w-4" strokeWidth={1.75} />
@@ -346,7 +346,7 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
                 type="button"
                 onClick={() => setPrepTab("stories")}
                 className={cn(
-                  "rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
+                  "min-h-[40px] rounded-full px-4 py-2 text-sm font-semibold transition-colors active:scale-[0.97]",
                   prepTab === "stories"
                     ? "bg-indigo-600 text-white"
                     : "text-slate-700 hover:bg-white/70"
@@ -358,7 +358,7 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
                 type="button"
                 onClick={() => setPrepTab("negotiation")}
                 className={cn(
-                  "rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
+                  "min-h-[40px] rounded-full px-4 py-2 text-sm font-semibold transition-colors active:scale-[0.97]",
                   prepTab === "negotiation"
                     ? "bg-emerald-600 text-white"
                     : "text-slate-700 hover:bg-white/70"
@@ -389,7 +389,7 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
                             `story-${idx}`
                           )
                         }
-                        className="inline-flex items-center gap-1 rounded-full border border-indigo-300/60 bg-white/65 px-3 py-1 text-xs font-medium text-indigo-900"
+                        className="inline-flex min-h-[36px] items-center gap-1 rounded-full border border-indigo-300/60 bg-white/65 px-3 py-1.5 text-xs font-medium text-indigo-900 active:scale-[0.97]"
                       >
                         {copied === `story-${idx}` ? (
                           <Check className="h-3.5 w-3.5" />
@@ -448,7 +448,7 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
                       <button
                         type="button"
                         onClick={() => void copyText(item.script, `neg-${idx}`)}
-                        className="inline-flex items-center gap-1 rounded-full border border-emerald-300/70 bg-white/65 px-3 py-1 text-xs font-medium text-emerald-900"
+                        className="inline-flex min-h-[36px] items-center gap-1 rounded-full border border-emerald-300/70 bg-white/65 px-3 py-1.5 text-xs font-medium text-emerald-900 active:scale-[0.97]"
                       >
                         {copied === `neg-${idx}` ? (
                           <Check className="h-3.5 w-3.5" />
@@ -484,7 +484,7 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
               disabled={pdfBusy || !selectedVariant}
               onClick={() => void downloadTailoredPdf()}
               className={cn(
-                "inline-flex items-center gap-2 rounded-full border border-emerald-400/50 bg-emerald-600/90 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+                "inline-flex min-h-[44px] items-center gap-2 rounded-full border border-emerald-400/50 bg-emerald-600/90 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 active:scale-[0.97] disabled:opacity-50"
               )}
             >
               {pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
@@ -495,7 +495,7 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
               disabled={tonesBusy}
               onClick={() => void runTones()}
               className={cn(
-                "inline-flex items-center gap-2 rounded-full border border-sky-400/50 bg-sky-500/90 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-600 disabled:opacity-50"
+                "inline-flex min-h-[44px] items-center gap-2 rounded-full border border-sky-400/50 bg-sky-500/90 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-600 active:scale-[0.97] disabled:opacity-50"
               )}
             >
               {tonesBusy ? (
@@ -533,14 +533,14 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
                     <button
                       type="button"
                       onClick={() => setSelectedTone(t.tone)}
-                      className="inline-flex items-center gap-1 rounded-full border border-white/60 bg-white/50 px-3 py-1 text-xs font-medium text-slate-800"
+                      className="inline-flex min-h-[36px] items-center gap-1 rounded-full border border-white/60 bg-white/50 px-3 py-1.5 text-xs font-medium text-slate-800 active:scale-[0.97]"
                     >
                       Use tone
                     </button>
                     <button
                       type="button"
                       onClick={() => void copyText(t.text, t.tone)}
-                      className="inline-flex items-center gap-1 rounded-full border border-white/60 bg-white/50 px-3 py-1 text-xs font-medium text-slate-800"
+                      className="inline-flex min-h-[36px] items-center gap-1 rounded-full border border-white/60 bg-white/50 px-3 py-1.5 text-xs font-medium text-slate-800 active:scale-[0.97]"
                     >
                       {copied === t.tone ? (
                         <Check className="h-3.5 w-3.5" />

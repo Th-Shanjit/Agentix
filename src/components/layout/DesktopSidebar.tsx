@@ -3,9 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { Briefcase, LogOut, UserRound } from "lucide-react";
-import { signOutAndReload } from "@/lib/auth-client";
 import { cn } from "@/lib/cn";
 
 const nav = [
@@ -77,7 +76,9 @@ export function DesktopSidebar() {
               onClick={() => {
                 if (signingOut) return;
                 setSigningOut(true);
-                void signOutAndReload("/board").catch(() => setSigningOut(false));
+                void signOut({ callbackUrl: "/login" }).catch(() =>
+                  setSigningOut(false)
+                );
               }}
               className="flex w-full items-center justify-center gap-2 rounded-full border border-white/20 bg-white/10 py-2 text-xs font-semibold text-slate-100 backdrop-blur-xl transition-all duration-300 hover:bg-white/20 disabled:cursor-wait disabled:opacity-70"
             >

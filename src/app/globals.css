@@ -14,11 +14,31 @@ html[data-theme="light"] {
 
 html {
   @apply antialiased;
+  overflow-x: hidden;
 }
 
 body {
   @apply min-h-dvh text-slate-100;
   background-color: var(--shell-bg);
+  overflow-x: hidden;
+}
+
+/* Prevent iOS Safari from zooming into inputs with small font sizes */
+@supports (-webkit-touch-callout: none) {
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
+}
+
+/* Hide scrollbar on horizontal-scroll containers while keeping scroll functional */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }
 
 /* Smooth focus for glass UI */

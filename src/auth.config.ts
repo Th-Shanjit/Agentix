@@ -1,49 +1,6 @@
 import type { NextAuthConfig } from "next-auth";
-import Google from "next-auth/providers/google";
-
-function cleanEnv(value: string | undefined) {
-  if (!value) return "";
-  return value.trim().replace(/^"(.*)"$/, "$1").replace(/^'(.*)'$/, "$1");
-}
-
-function googleCreds() {
-  const clientId = cleanEnv(
-    process.env.GOOGLE_CLIENT_ID ??
-      process.env.AUTH_GOOGLE_ID ??
-      process.env.AUTH_GOOGLE_CLIENT_ID
-  );
-  const clientSecret = cleanEnv(
-    process.env.GOOGLE_CLIENT_SECRET ??
-      process.env.AUTH_GOOGLE_SECRET ??
-      process.env.AUTH_GOOGLE_CLIENT_SECRET
-  );
-  return { clientId, clientSecret };
-}
-
-export function isGoogleConfigured() {
-  const { clientId, clientSecret } = googleCreds();
-  return Boolean(clientId) && Boolean(clientSecret);
-}
-
-/** Google OAuth is opt-in (set `AUTH_GOOGLE_ENABLED=true`) so email/password stays the default. */
-export function isGoogleOAuthEnabled() {
-  return (
-    process.env.AUTH_GOOGLE_ENABLED === "true" && isGoogleConfigured()
-  );
-}
 
 const providers: NextAuthConfig["providers"] = [];
-
-if (isGoogleOAuthEnabled()) {
-  const { clientId, clientSecret } = googleCreds();
-  providers.push(
-    Google({
-      clientId,
-      clientSecret,
-      allowDangerousEmailAccountLinking: true,
-    })
-  );
-}
 
 export default {
   providers,

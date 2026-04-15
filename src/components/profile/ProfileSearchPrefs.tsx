@@ -73,7 +73,7 @@ export function ProfileSearchPrefs({
             value={years}
             onChange={(e) => setYears(e.target.value)}
             placeholder="e.g. 5"
-            className="mt-1 w-full max-w-xs rounded-2xl border border-white/60 bg-white/50 px-3 py-2 text-sm text-slate-900 backdrop-blur-xl"
+            className="mt-1 w-full max-w-xs rounded-2xl border border-white/60 bg-white/50 px-3 py-3 text-base text-slate-900 backdrop-blur-xl sm:py-2 sm:text-sm"
           />
         </label>
         <label className="block text-xs font-medium text-slate-600">
@@ -82,7 +82,7 @@ export function ProfileSearchPrefs({
             value={countries}
             onChange={(e) => setCountries(e.target.value)}
             placeholder="India, Germany"
-            className="mt-1 w-full max-w-lg rounded-2xl border border-white/60 bg-white/50 px-3 py-2 text-sm text-slate-900 backdrop-blur-xl"
+            className="mt-1 w-full max-w-lg rounded-2xl border border-white/60 bg-white/50 px-3 py-3 text-base text-slate-900 backdrop-blur-xl sm:py-2 sm:text-sm"
           />
         </label>
         <label className="block text-xs font-medium text-slate-600">
@@ -92,7 +92,7 @@ export function ProfileSearchPrefs({
             onChange={(e) =>
               setRemote(e.target.value as RemotePreference)
             }
-            className="mt-1 block w-full max-w-xs rounded-2xl border border-white/60 bg-white/50 px-3 py-2 text-sm text-slate-900 backdrop-blur-xl"
+            className="mt-1 block w-full max-w-xs rounded-2xl border border-white/60 bg-white/50 px-3 py-3 text-base text-slate-900 backdrop-blur-xl sm:py-2 sm:text-sm"
           >
             {REMOTE_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -107,25 +107,25 @@ export function ProfileSearchPrefs({
             value={roles}
             onChange={(e) => setRoles(e.target.value)}
             placeholder="Associate Product Manager, Junior Product Manager"
-            className="mt-1 w-full max-w-lg rounded-2xl border border-white/60 bg-white/50 px-3 py-2 text-sm text-slate-900 backdrop-blur-xl"
+            className="mt-1 w-full max-w-lg rounded-2xl border border-white/60 bg-white/50 px-3 py-3 text-base text-slate-900 backdrop-blur-xl sm:py-2 sm:text-sm"
           />
           <span className="mt-1 block text-[11px] text-slate-500">
             Daily email alerts use these roles to detect relevant openings.
           </span>
         </label>
-        <label className="flex items-center gap-2 text-xs font-medium text-slate-600">
+        <label className="flex min-h-[44px] items-center gap-3 text-sm font-medium text-slate-600">
           <input
             type="checkbox"
             checked={alertEmailsEnabled}
             onChange={(e) => setAlertEmailsEnabled(e.target.checked)}
-            className="h-4 w-4 rounded border-white/60 bg-white/50"
+            className="h-5 w-5 rounded border-white/60 bg-white/50"
           />
           Enable daily alert emails
         </label>
         <button
           type="submit"
           disabled={busy}
-          className="rounded-full border border-sky-400/50 bg-sky-500/90 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-600 disabled:opacity-50"
+          className="min-h-[44px] w-full rounded-full border border-sky-400/50 bg-sky-500/90 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-600 active:scale-[0.98] disabled:opacity-50 sm:w-auto"
         >
           {busy ? "Saving…" : "Save preferences"}
         </button>
