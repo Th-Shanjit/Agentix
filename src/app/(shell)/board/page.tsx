@@ -26,11 +26,9 @@ export default async function BoardPage({
 
   return (
     <div className="space-y-6">
-      <header className="rounded-3xl border border-white/60 bg-white/40 p-6 shadow-glass backdrop-blur-2xl transition-all duration-300">
-        <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
-          My jobs
-        </h2>
-        <p className="mt-2 max-w-2xl text-sm text-slate-600">
+      <header className="card p-5">
+        <h2 className="section-heading text-2xl">My jobs</h2>
+        <p className="section-desc mt-1.5 max-w-2xl">
           Your list. Tap a title for details. Toggle <strong>Applied</strong>{" "}
           when you send an application.
         </p>

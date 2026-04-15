@@ -35,14 +35,12 @@ type AiOpen =
   | { mode: "ctc"; job: JobDTO }
   | { mode: "match"; job: JobDTO };
 
-/** Match modal errors: résumé fetch vs Gemini vs empty résumé. */
 type MatchErrState =
   | null
   | { kind: "no_resume" }
   | { kind: "resume_fetch" }
   | { kind: "gemini"; error: GeminiError };
 
-/** CTC modal: Gemini failures (retry → re-estimate) vs save failure (retry → save again). */
 type CtcErrState =
   | null
   | { kind: "gemini"; error: GeminiError }
@@ -61,9 +59,7 @@ function compactAmount(value: number) {
   return String(n);
 }
 
-function formatRangeLabel(
-  range: NonNullable<JobDTO["ctcRange"]>
-) {
+function formatRangeLabel(range: NonNullable<JobDTO["ctcRange"]>) {
   const periodLabel = range.period === "MONTHLY" ? "/Monthly" : "/Yearly";
   const currencySymbol: Record<string, string> = {
     USD: "$",
@@ -73,7 +69,11 @@ function formatRangeLabel(
     AED: "AED ",
     INR: "INR ",
   };
-  if (range.currency === "INR" && range.format === "LPA" && range.period === "YEARLY") {
+  if (
+    range.currency === "INR" &&
+    range.format === "LPA" &&
+    range.period === "YEARLY"
+  ) {
     const low = Math.max(0, Math.round(range.low / 100000));
     const high = Math.max(0, Math.round(range.high / 100000));
     return `${low}-${high}LPA`;
@@ -90,7 +90,6 @@ export function JobBoard({
   autoRefreshOnMount = false,
 }: JobBoardProps) {
   const { data: session, status: sessionStatus } = useSession();
-  /** Prefer live client session so Add job / imports match sidebar after sign-in without a full reload. */
   const effectiveUserId = session?.user?.id ?? userId ?? "";
 
   const [jobs, setJobs] = useState<JobDTO[]>(initialJobs);
@@ -121,7 +120,6 @@ export function JobBoard({
   const [sortBy, setSortBy] = useState<"recent" | "ctc">("recent");
   const [searchQuery, setSearchQuery] = useState("");
   const [ruthlessMode, setRuthlessMode] = useState(false);
-  /** So Gemini retry after error matches the same flow (e.g. redo skips cache). */
   const ctcEstimateOptsRef = useRef<{ forceRefresh: boolean }>({
     forceRefresh: false,
   });
@@ -264,40 +262,43 @@ export function JobBoard({
     void handleEstimateCtc(ai.job, { forceRefresh: true });
   }, [ai, handleEstimateCtc]);
 
-  const handleMatchResume = useCallback(async (job: JobDTO) => {
-    setAi({ mode: "match", job });
-    setMatchData(null);
-    setMatchErr(null);
+  const handleMatchResume = useCallback(
+    async (job: JobDTO) => {
+      setAi({ mode: "match", job });
+      setMatchData(null);
+      setMatchErr(null);
 
-    const res = await fetch("/api/user/resume");
-    if (!res.ok) {
-      setMatchErr({ kind: "resume_fetch" });
-      return;
-    }
-    const payload: unknown = await res.json();
-    const text =
-      payload &&
-      typeof payload === "object" &&
-      "text" in payload &&
-      typeof (payload as { text: unknown }).text === "string"
-        ? (payload as { text: string }).text
-        : null;
-    if (!text?.trim()) {
-      setMatchErr({ kind: "no_resume" });
-      return;
-    }
+      const res = await fetch("/api/user/resume");
+      if (!res.ok) {
+        setMatchErr({ kind: "resume_fetch" });
+        return;
+      }
+      const payload: unknown = await res.json();
+      const text =
+        payload &&
+        typeof payload === "object" &&
+        "text" in payload &&
+        typeof (payload as { text: unknown }).text === "string"
+          ? (payload as { text: string }).text
+          : null;
+      if (!text?.trim()) {
+        setMatchErr({ kind: "no_resume" });
+        return;
+      }
 
-    setMatchLoading(true);
-    const r = await matchResumeATS(
-      text,
-      job.role,
-      job.company,
-      job.description ?? jdInput
-    );
-    setMatchLoading(false);
-    if (r.ok) setMatchData(r.data);
-    else setMatchErr({ kind: "gemini", error: r.error });
-  }, [jdInput]);
+      setMatchLoading(true);
+      const r = await matchResumeATS(
+        text,
+        job.role,
+        job.company,
+        job.description ?? jdInput
+      );
+      setMatchLoading(false);
+      if (r.ok) setMatchData(r.data);
+      else setMatchErr({ kind: "gemini", error: r.error });
+    },
+    [jdInput]
+  );
 
   const retryMatchResume = useCallback(() => {
     if (!ai || ai.mode !== "match") return;
@@ -432,7 +433,9 @@ export function JobBoard({
           ) {
             return true;
           }
-          const grade = relevanceScoreToLetterGrade(Math.round(j.relevanceScore));
+          const grade = relevanceScoreToLetterGrade(
+            Math.round(j.relevanceScore)
+          );
           return grade === "A" || grade === "B";
         })
       : searched;
@@ -488,32 +491,53 @@ export function JobBoard({
       }
     }
     setBulkEstimating(false);
-    toast.success(`CTC estimated for ${success} listing${success === 1 ? "" : "s"}.`);
+    toast.success(
+      `CTC estimated for ${success} listing${success === 1 ? "" : "s"}.`
+    );
     if (failed > 0) {
-      toast.message(`${failed} listing${failed === 1 ? "" : "s"} could not be estimated.`);
+      toast.message(
+        `${failed} listing${failed === 1 ? "" : "s"} could not be estimated.`
+      );
     }
   }, [bulkEligible]);
 
+  const tabBtn = (
+    label: string,
+    value: typeof tab,
+    current: typeof tab,
+    onClick: () => void
+  ) => (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "btn text-sm",
+        current === value
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-border bg-surface text-foreground-secondary hover:bg-surface-hover"
+      )}
+    >
+      {label}
+    </button>
+  );
+
   return (
-    <div className="space-y-3 sm:space-y-4">
+    <div className="space-y-4">
+      {/* ── CTC Modal ──────────────────────────────────────────── */}
       <GlassModal
         open={ai?.mode === "ctc"}
         onClose={closeAi}
         title="CTC information"
         footer={
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-            <button
-              type="button"
-              onClick={closeAi}
-              className="min-h-[44px] w-full rounded-full border border-white/60 bg-white/45 px-4 py-2.5 text-xs font-semibold text-slate-800 backdrop-blur-xl transition-all duration-300 hover:bg-white/65 active:scale-[0.99] sm:w-auto sm:min-h-0 sm:py-2"
-            >
+            <button type="button" onClick={closeAi} className="btn-secondary w-full sm:w-auto">
               Close
             </button>
             <button
               type="button"
               onClick={redoEstimateCtc}
               disabled={ctcLoading || saveCtcBusy}
-              className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-sky-300/80 bg-sky-500/90 px-4 py-2.5 text-xs font-semibold text-white shadow-sm backdrop-blur-xl transition-all duration-300 hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-h-0 sm:py-2"
+              className="btn-primary w-full sm:w-auto"
               title="Regenerate INR CTC estimate"
             >
               <RefreshCw className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -524,11 +548,11 @@ export function JobBoard({
       >
         {ai?.mode === "ctc" && (
           <div className="space-y-3">
-            <p className="text-xs text-slate-600">
+            <p className="text-xs text-foreground-muted">
               {ai.job.role} · {ai.job.company}
             </p>
             {ctcLoading && (
-              <p className="text-sm text-slate-600">Asking Gemini…</p>
+              <p className="text-sm text-foreground-muted">Asking Gemini…</p>
             )}
             {ctcErr?.kind === "gemini" && (
               <GeminiErrorCallout
@@ -538,17 +562,15 @@ export function JobBoard({
               />
             )}
             {ctcErr?.kind === "save" && (
-              <p className="rounded-xl border border-red-200/80 bg-red-50/90 px-3 py-2 text-sm text-red-800">
-                {ctcErr.message}
-              </p>
+              <p className="callout-error">{ctcErr.message}</p>
             )}
             {ctcText && (
-              <div className="whitespace-pre-wrap rounded-2xl border border-white/50 bg-white/35 p-4 text-sm leading-relaxed text-slate-800">
+              <div className="card-inset whitespace-pre-wrap p-4 text-sm leading-relaxed text-foreground-secondary">
                 {ctcText}
               </div>
             )}
             {ctcRange && (
-              <p className="rounded-xl border border-sky-200/70 bg-sky-50/80 px-3 py-2 text-xs text-sky-900">
+              <p className="callout-info">
                 Estimated range metadata: {formatRangeLabel(ctcRange)}
               </p>
             )}
@@ -556,6 +578,7 @@ export function JobBoard({
         )}
       </GlassModal>
 
+      {/* ── Match Modal ────────────────────────────────────────── */}
       <GlassModal
         open={ai?.mode === "match"}
         onClose={closeAi}
@@ -564,45 +587,51 @@ export function JobBoard({
       >
         {ai?.mode === "match" && (
           <div className="space-y-4">
-            <p className="text-xs text-slate-600">
+            <p className="text-xs text-foreground-muted">
               {ai.job.role} · {ai.job.company}
             </p>
             {!ai.job.description && (
-              <label className="block text-xs font-medium text-slate-600">
-                Job description (optional fallback)
+              <div>
+                <label htmlFor="jd-fallback" className="label">
+                  Job description (optional fallback)
+                </label>
                 <textarea
+                  id="jd-fallback"
                   value={jdInput}
                   onChange={(e) => setJdInput(e.target.value)}
                   rows={4}
                   placeholder="Paste role summary if posting has no description."
-                  className="mt-1 w-full rounded-2xl border border-white/60 bg-white/40 px-3 py-2.5 text-base text-slate-800 sm:text-sm"
+                  className="input mt-1.5"
                 />
-              </label>
+              </div>
             )}
             {matchErr?.kind === "no_resume" && (
-              <div className="rounded-2xl border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm text-amber-950">
-                <p className="font-medium">No résumé text saved yet.</p>
-                <p className="mt-1 text-amber-900/90">
+              <div className="callout-warn">
+                <p className="font-medium">No resume text saved yet.</p>
+                <p className="mt-1">
                   Upload a PDF on{" "}
                   <Link
                     href="/profile"
-                    className="font-semibold text-sky-800 underline underline-offset-2"
+                    className="font-medium text-primary underline underline-offset-2"
                     onClick={closeAi}
                   >
                     Profile
                   </Link>
-                  . Text is extracted in your browser and stored on your account.
+                  . Text is extracted in your browser and stored on your
+                  account.
                 </p>
               </div>
             )}
             {matchErr?.kind === "resume_fetch" && (
-              <div className="rounded-2xl border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm text-amber-950">
-                <p className="font-medium">Could not load your saved résumé.</p>
-                <p className="mt-1 text-amber-900/90">
+              <div className="callout-warn">
+                <p className="font-medium">
+                  Could not load your saved resume.
+                </p>
+                <p className="mt-1">
                   Refresh the page or re-upload on{" "}
                   <Link
                     href="/profile"
-                    className="font-semibold text-sky-800 underline underline-offset-2"
+                    className="font-medium text-primary underline underline-offset-2"
                     onClick={closeAi}
                   >
                     Profile
@@ -619,21 +648,21 @@ export function JobBoard({
               />
             )}
             {matchLoading && (
-              <p className="text-sm text-slate-600">Analyzing résumé with Gemini…</p>
+              <p className="text-sm text-foreground-muted">
+                Analyzing resume with Gemini…
+              </p>
             )}
             {matchData && !matchLoading && (
               <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
                 <RadialScore percentage={matchData.matchPercentage} />
                 <div className="min-w-0 flex-1 space-y-3">
-                  <p className="text-sm font-medium text-slate-900">
+                  <p className="text-sm font-medium text-foreground">
                     {matchData.verdict}
                   </p>
                   {matchData.strengths.length > 0 && (
                     <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                        Strengths
-                      </p>
-                      <ul className="mt-1 list-inside list-disc text-sm text-slate-700">
+                      <p className="kicker">Strengths</p>
+                      <ul className="mt-1 list-inside list-disc text-sm text-foreground-secondary">
                         {matchData.strengths.map((s) => (
                           <li key={s}>{s}</li>
                         ))}
@@ -642,14 +671,12 @@ export function JobBoard({
                   )}
                   {matchData.missingKeywords.length > 0 && (
                     <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                        Gaps / keywords
-                      </p>
+                      <p className="kicker">Gaps / keywords</p>
                       <div className="mt-1 flex flex-wrap gap-1.5">
                         {matchData.missingKeywords.map((k) => (
                           <span
                             key={k}
-                            className="rounded-full border border-white/60 bg-white/40 px-2.5 py-0.5 text-xs text-slate-800"
+                            className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs text-foreground-secondary"
                           >
                             {k}
                           </span>
@@ -674,61 +701,32 @@ export function JobBoard({
       <JobsImportUpload onImported={refresh} />
       <BulkUrlImporter onImported={refresh} />
 
+      {/* ── Search ─────────────────────────────────────────────── */}
       <div className="relative">
         <Search
-          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted"
           strokeWidth={1.75}
         />
         <input
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Quick search listings..."
-          className="w-full rounded-2xl border border-white/60 bg-white/45 py-3 pl-9 pr-3 text-base text-slate-900 shadow-sm backdrop-blur-xl placeholder:text-slate-500 sm:py-2.5 sm:text-sm"
+          className="input pl-9"
         />
       </div>
 
+      {/* ── Filter bar ─────────────────────────────────────────── */}
       <div className="-mx-1 overflow-x-auto px-1 scrollbar-none">
         <div className="flex min-w-max items-center gap-2 pb-1">
-          <button
-            type="button"
-            onClick={() => setTab("all")}
-            className={cn(
-              "min-h-[44px] rounded-full border px-4 py-2 text-sm font-semibold active:scale-[0.97]",
-              tab === "all"
-                ? "border-sky-400/50 bg-sky-500/90 text-white"
-                : "border-white/60 bg-white/45 text-slate-700"
-            )}
-          >
-            All
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("applied")}
-            className={cn(
-              "min-h-[44px] rounded-full border px-4 py-2 text-sm font-semibold active:scale-[0.97]",
-              tab === "applied"
-                ? "border-sky-400/50 bg-sky-500/90 text-white"
-                : "border-white/60 bg-white/45 text-slate-700"
-            )}
-          >
-            Applied
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab("pending")}
-            className={cn(
-              "min-h-[44px] rounded-full border px-4 py-2 text-sm font-semibold active:scale-[0.97]",
-              tab === "pending"
-                ? "border-sky-400/50 bg-sky-500/90 text-white"
-                : "border-white/60 bg-white/45 text-slate-700"
-            )}
-          >
-            Not Applied
-          </button>
+          {tabBtn("All", "all", tab, () => setTab("all"))}
+          {tabBtn("Applied", "applied", tab, () => setTab("applied"))}
+          {tabBtn("Not Applied", "pending", tab, () => setTab("pending"))}
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value === "ctc" ? "ctc" : "recent")}
-            className="min-h-[44px] rounded-full border border-white/60 bg-white/45 px-4 py-2 text-sm font-semibold text-slate-700"
+            onChange={(e) =>
+              setSortBy(e.target.value === "ctc" ? "ctc" : "recent")
+            }
+            className="input w-auto min-w-0"
           >
             <option value="recent">Sort: Recent</option>
             <option value="ctc">Sort: CTC estimate</option>
@@ -737,11 +735,7 @@ export function JobBoard({
             type="button"
             onClick={() => void estimateAllVisibleCtc()}
             disabled={aiBusy || bulkEligible.length === 0}
-            className={cn(
-              "min-h-[44px] rounded-full border px-4 py-2 text-sm font-semibold active:scale-[0.97]",
-              "border-sky-400/50 bg-sky-500/90 text-white",
-              "disabled:cursor-not-allowed disabled:opacity-50"
-            )}
+            className="btn-primary text-sm"
           >
             {bulkEstimating ? "Estimating all..." : "Estimate all CTC"}
           </button>
@@ -749,10 +743,10 @@ export function JobBoard({
             type="button"
             onClick={() => setRuthlessMode((v) => !v)}
             className={cn(
-              "min-h-[44px] rounded-full border px-4 py-2 text-sm font-semibold active:scale-[0.97]",
+              "btn text-sm",
               ruthlessMode
-                ? "border-[#A16E83]/70 bg-[#A16E83]/90 text-white"
-                : "border-white/60 bg-white/45 text-slate-700"
+                ? "border-red-400 bg-red-500 text-white"
+                : "border-border bg-surface text-foreground-secondary hover:bg-surface-hover"
             )}
           >
             Ruthless Mode (Hide &lt; B Grade)
@@ -760,6 +754,7 @@ export function JobBoard({
         </div>
       </div>
 
+      {/* ── Actions ────────────────────────────────────────────── */}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           <button
@@ -768,10 +763,7 @@ export function JobBoard({
             disabled={
               sessionStatus === "loading" || !effectiveUserId || addSubmitting
             }
-            className={cn(
-              "inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-white/60 bg-white/45 px-4 py-2.5 text-xs font-semibold text-slate-800 shadow-sm backdrop-blur-xl transition-all duration-300 sm:w-auto sm:min-h-0 sm:py-2",
-              "hover:bg-white/65 disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.99]"
-            )}
+            className="btn-secondary w-full sm:w-auto"
           >
             <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
             Quick add
@@ -780,10 +772,7 @@ export function JobBoard({
             type="button"
             onClick={() => refresh()}
             disabled={refreshing}
-            className={cn(
-              "inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-white/60 bg-white/45 px-4 py-2.5 text-xs font-semibold text-slate-800 shadow-sm backdrop-blur-xl transition-all duration-300 sm:w-auto sm:min-h-0 sm:py-2",
-              "hover:bg-white/65 disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.99]"
-            )}
+            className="btn-secondary w-full sm:w-auto"
           >
             <RefreshCw
               className={cn("h-3.5 w-3.5", refreshing && "animate-spin")}
@@ -794,28 +783,32 @@ export function JobBoard({
         </div>
       </div>
 
+      {/* ── Job list / empty ───────────────────────────────────── */}
       {empty ? (
-        <section className="rounded-3xl border border-dashed border-white/50 bg-white/25 p-6 text-center shadow-inner backdrop-blur-xl sm:p-10">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-white/60 bg-white/45 shadow-inner backdrop-blur-md">
-            <Briefcase className="h-7 w-7 text-sky-700/85" strokeWidth={1.5} />
+        <section className="card border-dashed p-8 text-center sm:p-12">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl border border-border bg-surface-inset">
+            <Briefcase
+              className="h-7 w-7 text-primary/70"
+              strokeWidth={1.5}
+            />
           </div>
-          <h3 className="mt-4 text-base font-semibold tracking-tight text-slate-900">
+          <h3 className="mt-4 text-base font-semibold text-foreground">
             Your job tracker is empty
           </h3>
-          <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-600">
-            Start building your personal pipeline by adding your first application.
+          <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-foreground-secondary">
+            Start building your personal pipeline by adding your first
+            application.
           </p>
           <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             <button
               type="button"
               onClick={() => setAddOpen(true)}
               disabled={
-                sessionStatus === "loading" || !effectiveUserId || addSubmitting
+                sessionStatus === "loading" ||
+                !effectiveUserId ||
+                addSubmitting
               }
-              className={cn(
-                "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-sky-400/40 bg-sky-500/90 px-5 py-2.5 text-xs font-semibold text-white shadow-md backdrop-blur-xl transition-all duration-300",
-                "hover:bg-sky-600 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
-              )}
+              className="btn-primary"
             >
               <Plus className="h-3.5 w-3.5" strokeWidth={1.75} />
               Add Job Manually
@@ -823,7 +816,7 @@ export function JobBoard({
           </div>
         </section>
       ) : (
-        <ul className="space-y-4">
+        <ul className="space-y-3">
           {filtered.map((job) => (
             <li key={job.id}>
               <JobCard

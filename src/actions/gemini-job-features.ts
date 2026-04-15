@@ -5,11 +5,20 @@ import {
   geminiError,
   getGeminiModel,
   mapGeminiException,
+  parseCtcConfidence,
+  type CtcConfidenceLevel,
   type GeminiError,
 } from "@/lib/gemini-internal";
 
 const MAX_RESUME = 28_000;
 const MAX_DESC = 8_000;
+
+function geminiJsonRequest(prompt: string) {
+  return {
+    contents: [{ role: "user" as const, parts: [{ text: prompt }] }],
+    generationConfig: { responseMimeType: "application/json" as const },
+  };
+}
 
 export type SearchMatchRow = {
   jobId: string;
@@ -73,12 +82,11 @@ export async function rankRoleSimilarity(
 Intended role: "${intendedRole.trim()}"
 Candidate roles: ${JSON.stringify(candidateRoles)}
 
-Return ONLY a JSON array of candidate role strings that are close enough to consider relevant.
-Include junior/senior/intern/associate variations if they are in same domain.
-No markdown, no explanation.`;
+Output a JSON array of strings: candidate roles from the list above that are close enough to consider relevant.
+Include junior/senior/intern/associate variations if they are in the same domain.`;
   try {
     const model = getGeminiModel();
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent(geminiJsonRequest(prompt));
     const raw = result.response.text().trim();
     const arr = extractJsonArray(raw);
     if (!arr) {
@@ -208,7 +216,7 @@ Evaluate each job using these dimensions before scoring:
 2) Gap Mitigation: What is missing, and can it be learned quickly?
 3) Level Strategy: Is the candidate too senior or junior for this specific listing?
 
-Return ONLY a JSON array (no markdown). Each element must have:
+Output a JSON array. Each element must have:
 - "jobId": string (exact id from input)
 - "archetype": string (pick one concise category, e.g. "Software Engineering", "Product", "Design", "Sales", "LLMOps")
 - "fitScore": number 0-100 (how well the résumé fits the role today)
@@ -222,7 +230,7 @@ If uncertain, still output best-effort numbers.`;
 
   try {
     const model = getGeminiModel();
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent(geminiJsonRequest(prompt));
     const raw = result.response.text().trim();
     const arr = extractJsonArray(raw);
     if (!arr) {
@@ -294,7 +302,7 @@ export async function mapImportRowsWithGemini(
   const prompt = `You normalize uploaded job records from mixed schemas.
 Input is a JSON array of row objects. Keys may vary (for example: companyName, employer, title, job_title, applyUrl, posting_link, etc.).
 
-Return ONLY one JSON object:
+Respond with one object shaped like:
 {
   "rows": [ ...normalized rows... ],
   "audit": [
@@ -313,14 +321,13 @@ Rules:
 - Keep only rows that clearly have company, role, and link.
 - link must look like a web URL.
 - If missing optional fields, set null.
-- Do not include commentary or markdown.
 
 Rows:
 ${JSON.stringify(sample)}`;
 
   try {
     const model = getGeminiModel();
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent(geminiJsonRequest(prompt));
     const raw = result.response.text().trim();
     const obj = extractJsonObject(raw);
     if (!obj || !Array.isArray(obj.rows)) {
@@ -402,7 +409,7 @@ body excerpt:
 ${input.bodyText.slice(0, 12000)}
 """
 
-Return ONLY one JSON object with this exact shape:
+Respond with an object:
 { "title": string, "company": string, "location": string | null, "description": string | null }
 
 Rules:
@@ -410,12 +417,11 @@ Rules:
 - company: employer/company name.
 - location: short location string or null.
 - description: concise plain-text summary of role requirements and responsibilities.
-- If uncertain, return best effort with non-empty title/company when possible.
-- No markdown, no commentary.`;
+- If uncertain, return best effort with non-empty title/company when possible.`;
 
   try {
     const model = getGeminiModel();
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent(geminiJsonRequest(prompt));
     const raw = result.response.text().trim();
     const obj = extractJsonObject(raw);
     if (!obj) {
@@ -464,6 +470,7 @@ export type JobEnrichmentPayload = {
     high: number;
     currency: string;
     credibilityNote: string;
+    confidence: CtcConfidenceLevel;
   };
   ratingsWeb: {
     glassdoorSummary: string;
@@ -563,35 +570,27 @@ ${bragSheet || "(none provided)"}
 
 Use the highlights as concrete evidence when evaluating fit and crafting tailored recommendations.
 
-Return ONLY one JSON object (no markdown) with keys:
-- "ctcBands": { "low": number, "mid": number, "high": number, "currency": string (e.g. USD or INR), "credibilityNote": string (1-2 sentences on uncertainty) }
+Respond with one object containing:
+- "ctcBands": { "low": number, "mid": number, "high": number, "currency": string (e.g. USD or INR), "credibilityNote": string (1-2 sentences on uncertainty), "confidence": "LOW" | "MID" | "HIGH" }
+  Set "confidence" to "HIGH" if you have strong verified data for this exact company/role, "MID" if based mainly on industry averages, or "LOW" if guessing from sparse data. (This reflects estimate reliability, not the numeric spread.)
 - "ratingsWeb": { "glassdoorSummary": string (include useful rating/context signals found online), "ambitionBoxSummary": string, "disclaimer": string }
 - "forumSentiment": { "summary": string (1-3 sentences), "label": string (e.g. Mixed), "disclaimer": string }
 - "resumeGrade": number 0-100 (0 if no résumé)
 - "resumeStrengths": string[]
 - "resumeWeaknesses": string[]
 - "areasToFix": string[] (actionable bullets)
-- "interviewStories": array of exactly 5 objects, each:
+- "interviewStories": exactly 5 objects, each:
   { "title": string, "situation": string, "task": string, "action": string, "result": string }
-  (STAR format; use realistic evidence from resume/highlights and align each story to the role)
-- "negotiationStrategy": array of exactly 3 objects, each:
+  Use STAR: situation, task, action, result; ground stories in resume/highlights and this role.
+- "negotiationStrategy": exactly 3 objects, each:
   { "scenario": string, "script": string }
-  (tactical salary/offer negotiation scripts or emails, including handling pushback and using estimated CTC context)
+  Tactical salary/offer negotiation scripts or emails, including pushback and estimated CTC context.
 
-"Based on the candidate's resume and brag sheet, generate 5 behavioral interview stories tailored specifically to the requirements of this job description. 
-Format each story strictly using the STAR+R method:
-- Situation: Context of the project.
-- Task: The specific problem to solve.
-- Action: What the candidate actually did (highlighting skills relevant to THIS job).
-- Result: The measurable impact.
-- Reflection: What was learned.
-Return this as a JSON array of objects."
-
-No markdown, no commentary.`;
+For "interviewStories", generate 5 behavioral stories tailored to this job description. Each story follows STAR (reflection can fold into result text if needed).`;
 
   try {
-    const model = getGeminiModel();
-    const result = await model.generateContent(prompt);
+    const model = getGeminiModel(true);
+    const result = await model.generateContent(geminiJsonRequest(prompt));
     const raw = result.response.text().trim();
     const o = extractJsonObject(raw);
     if (!o || !o.ctcBands || !o.ratingsWeb || !o.forumSentiment) {
@@ -622,6 +621,7 @@ No markdown, no commentary.`;
           typeof bands.credibilityNote === "string"
             ? bands.credibilityNote
             : "Estimate only.",
+        confidence: parseCtcConfidence(bands.confidence),
       },
       ratingsWeb: {
         glassdoorSummary:
@@ -735,7 +735,7 @@ Source résumé:
 ${resume}
 """
 
-Return ONLY JSON array with exactly 5 objects, each:
+Output a JSON array of exactly 5 objects, each:
 { "tone": string, "text": string }
 
 Tones must be: "Neutral", "Confident", "Concise", "Narrative", "Executive"
@@ -743,7 +743,7 @@ Each "text" is full résumé body plain text, ready to paste.`;
 
   try {
     const model = getGeminiModel();
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent(geminiJsonRequest(prompt));
     const raw = result.response.text().trim();
     const arr = extractJsonArray(raw);
     if (!arr || arr.length < 1) {
@@ -841,13 +841,18 @@ export async function extractExperienceYearsBatch(
     return { ok: true, byKey };
   }
 
-  const CHUNK = 5;
+  const CHUNK = 25;
+  const EXPERIENCE_CONCURRENCY = 3;
   const MAX_TEXT = 6000;
 
   try {
     const model = getGeminiModel();
+    const subChunks: (typeof needModel)[] = [];
     for (let i = 0; i < needModel.length; i += CHUNK) {
-      const chunk = needModel.slice(i, i + CHUNK);
+      subChunks.push(needModel.slice(i, i + CHUNK));
+    }
+
+    const runExperienceChunk = async (chunk: typeof needModel): Promise<void> => {
       const payload = chunk.map((it) => ({
         key: it.key,
         title: it.title,
@@ -861,7 +866,7 @@ export async function extractExperienceYearsBatch(
 Input JSON array (one object per job):
 ${JSON.stringify(payload)}
 
-Return ONLY a JSON array. One object per input job; each object MUST include the same "key" string as its input row.
+Output a JSON array with one object per input job; each object MUST include the same "key" string as its input row.
 
 Each object shape:
 { "key": string, "experienceYearsMin": number | null, "experienceYearsMax": number | null }
@@ -875,16 +880,12 @@ Rules:
 - "5+ years", "minimum 5+ years experience" → min=5, max=null
 - "0-1 years", "entry level", "new grad" with explicit years → set sensible min/max; if only "entry level" with no years, prefer nulls unless a range is explicit.
 - If the posting does not mention experience/years for the role, return both null.
-- Do not infer numeric years from job title alone when the text does not state them.
+- Do not infer numeric years from job title alone when the text does not state them.`;
 
-No markdown, no commentary.`;
-
-      const result = await model.generateContent(prompt);
+      const result = await model.generateContent(geminiJsonRequest(prompt));
       const raw = result.response.text().trim();
       const arr = extractJsonArray(raw);
-      if (!arr) {
-        continue;
-      }
+      if (!arr) return;
       for (const item of arr) {
         if (!item || typeof item !== "object") continue;
         const o = item as Record<string, unknown>;
@@ -902,7 +903,13 @@ No markdown, no commentary.`;
           o.maximumYears;
         byKey[key] = normalizeExperienceYearsPair(lo, hi);
       }
+    };
+
+    for (let waveStart = 0; waveStart < subChunks.length; waveStart += EXPERIENCE_CONCURRENCY) {
+      const wave = subChunks.slice(waveStart, waveStart + EXPERIENCE_CONCURRENCY);
+      await Promise.all(wave.map((ch) => runExperienceChunk(ch)));
     }
+
     return { ok: true, byKey };
   } catch (e) {
     return {

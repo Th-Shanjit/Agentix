@@ -48,6 +48,7 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
         high?: number;
         currency?: string;
         credibilityNote?: string;
+        confidence?: "LOW" | "MID" | "HIGH";
       }
     | undefined;
 
@@ -88,7 +89,9 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
         .slice(0, 5)
     : [];
 
-  const negotiationScripts = Array.isArray(data.enrichment?.negotiationStrategy)
+  const negotiationScripts = Array.isArray(
+    data.enrichment?.negotiationStrategy
+  )
     ? data.enrichment.negotiationStrategy
         .filter(
           (x): x is { scenario: string; script: string } =>
@@ -119,7 +122,7 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
           ? prev
           : (r.variants[0]?.tone ?? null)
       );
-      toast.success("Résumé variants ready.");
+      toast.success("Resume variants ready.");
     } finally {
       setTonesBusy(false);
     }
@@ -138,14 +141,22 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
     setPdfBusy(true);
     try {
       const html2pdf = (await import("html2pdf.js")).default;
-      const safeTone = selectedVariant.tone.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-      const safeCompany = data.listing.company.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      const safeTone = selectedVariant.tone
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-");
+      const safeCompany = data.listing.company
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-");
       await html2pdf()
         .set({
           filename: `tailored-ats-${safeCompany}-${safeTone || "resume"}.pdf`,
           margin: [0, 0, 0, 0],
           image: { type: "jpeg", quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+          html2canvas: {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: "#ffffff",
+          },
           jsPDF: { unit: "pt", format: "a4", orientation: "portrait" },
         })
         .from(node)
@@ -172,27 +183,26 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3 text-sm">
-        <Link
-          href="/board"
-          className="inline-flex min-h-[44px] items-center rounded-full border border-white/60 bg-white/40 px-4 py-2 font-medium text-slate-700 backdrop-blur-xl hover:bg-white/60 active:scale-[0.97]"
-        >
+        <Link href="/board" className="btn-secondary">
           ← My jobs
         </Link>
       </div>
 
-      <header className="rounded-3xl border border-white/60 bg-white/40 p-4 shadow-glass backdrop-blur-2xl sm:p-6">
-        <h1 className="text-2xl font-semibold text-slate-900">
+      <header className="card p-5 sm:p-6">
+        <h1 className="text-2xl font-semibold text-foreground">
           {data.listing.title}
         </h1>
-        <p className="mt-1 text-lg text-slate-700">{data.listing.company}</p>
-        <p className="mt-2 text-sm text-slate-600">
+        <p className="mt-1 text-lg text-foreground-secondary">
+          {data.listing.company}
+        </p>
+        <p className="mt-2 text-sm text-foreground-muted">
           {data.listing.location ?? "Location unknown"}
           {data.listing.remotePolicy
             ? ` · ${data.listing.remotePolicy}`
             : ""}
         </p>
         {data.listing.ctc && (
-          <p className="mt-2 text-sm font-medium text-sky-900">
+          <p className="mt-2 text-sm font-medium text-primary">
             Listed: {data.listing.ctc}
           </p>
         )}
@@ -200,7 +210,7 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
           href={data.listing.sourceUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-4 inline-flex min-h-[44px] items-center gap-2 rounded-full border border-sky-300/50 bg-sky-500/90 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-600 active:scale-[0.97]"
+          className="btn-primary mt-4 inline-flex"
         >
           Open posting
           <ExternalLink className="h-4 w-4" strokeWidth={1.75} />
@@ -208,27 +218,28 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
       </header>
 
       {bands && (
-        <section className="rounded-3xl border border-white/60 bg-white/40 p-6 shadow-glass backdrop-blur-2xl">
-          <h2 className="text-lg font-semibold text-slate-900">
-            Compensation bands (estimate)
-          </h2>
-          <p className="mt-1 text-xs text-amber-800">
-            AI estimate — not verified. {bands.credibilityNote ?? ""}
+        <section className="card p-5">
+          <h2 className="section-heading">Compensation bands (estimate)</h2>
+          <p className="mt-1 text-xs" style={{ color: "var(--callout-warn-text)" }}>
+            AI estimate — not verified.
+            {bands.confidence
+              ? ` Data confidence: ${bands.confidence}.`
+              : null}{" "}
+            {bands.credibilityNote ?? ""}
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            {[
-              ["Low", bands.low],
-              ["Mid", bands.mid],
-              ["High", bands.high],
-            ].map(([label, val]) => (
-              <div
-                key={label}
-                className="rounded-2xl border border-white/50 bg-white/35 p-4 text-center backdrop-blur-xl"
-              >
-                <p className="text-xs font-medium uppercase text-slate-500">
+            {(
+              [
+                ["Low", bands.low],
+                ["Mid", bands.mid],
+                ["High", bands.high],
+              ] as const
+            ).map(([label, val]) => (
+              <div key={label} className="card-inset p-4 text-center">
+                <p className="text-xs font-medium uppercase text-foreground-muted">
                   {label}
                 </p>
-                <p className="mt-1 text-lg font-semibold text-slate-900">
+                <p className="mt-1 text-lg font-semibold text-foreground">
                   {typeof val === "number"
                     ? `${bands.currency ?? ""} ${val.toLocaleString()}`.trim()
                     : "—"}
@@ -240,22 +251,18 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
       )}
 
       {ratings && (
-        <section className="rounded-3xl border border-white/60 bg-white/40 p-6 shadow-glass backdrop-blur-2xl">
-          <h2 className="text-lg font-semibold text-slate-900">
-            Employer reputation (summary)
-          </h2>
-          <p className="mt-1 text-xs text-amber-900">{ratings.disclaimer}</p>
-          <div className="mt-4 space-y-3 text-sm text-slate-700">
+        <section className="card p-5">
+          <h2 className="section-heading">Employer reputation (summary)</h2>
+          <p className="mt-1 text-xs" style={{ color: "var(--callout-warn-text)" }}>
+            {ratings.disclaimer}
+          </p>
+          <div className="mt-4 space-y-3 text-sm text-foreground-secondary">
             <div>
-              <p className="text-xs font-semibold text-slate-500">
-                Public-style (Glassdoor-like)
-              </p>
+              <p className="label">Public-style (Glassdoor-like)</p>
               <p className="mt-1">{ratings.glassdoorSummary}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold text-slate-500">
-                India-style (AmbitionBox-like)
-              </p>
+              <p className="label">India-style (AmbitionBox-like)</p>
               <p className="mt-1">{ratings.ambitionBoxSummary}</p>
             </div>
           </div>
@@ -263,53 +270,53 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
       )}
 
       {forum && (
-        <section className="rounded-3xl border border-white/60 bg-white/40 p-6 shadow-glass backdrop-blur-2xl">
-          <h2 className="text-lg font-semibold text-slate-900">
-            Forum / social tone
-          </h2>
-          <p className="text-xs text-amber-900">{forum.disclaimer}</p>
-          <p className="mt-2 text-sm font-medium text-slate-800">
+        <section className="card p-5">
+          <h2 className="section-heading">Forum / social tone</h2>
+          <p className="text-xs" style={{ color: "var(--callout-warn-text)" }}>
+            {forum.disclaimer}
+          </p>
+          <p className="mt-2 text-sm font-medium text-foreground">
             {forum.label}
           </p>
-          <p className="mt-1 text-sm text-slate-700">{forum.summary}</p>
+          <p className="mt-1 text-sm text-foreground-secondary">
+            {forum.summary}
+          </p>
         </section>
       )}
 
       {data.listing.description && (
-        <section className="rounded-3xl border border-white/60 bg-white/40 p-6 shadow-glass backdrop-blur-2xl">
-          <h2 className="text-lg font-semibold text-slate-900">Description</h2>
-          <div className="mt-3 max-h-96 overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+        <section className="card p-5">
+          <h2 className="section-heading">Description</h2>
+          <div className="mt-3 max-h-96 overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed text-foreground-secondary">
             {data.listing.description}
           </div>
         </section>
       )}
 
       {data.enrichment && (
-        <section className="rounded-3xl border border-white/60 bg-white/40 p-6 shadow-glass backdrop-blur-2xl">
-          <h2 className="text-lg font-semibold text-slate-900">
-            Résumé vs role
-          </h2>
-          <p className="mt-2 text-3xl font-bold text-sky-900">
+        <section className="card p-5">
+          <h2 className="section-heading">Resume vs role</h2>
+          <p className="mt-2 text-3xl font-bold text-primary">
             {data.enrichment.resumeGrade != null
               ? `${Math.round(data.enrichment.resumeGrade)} / 100`
               : "—"}
           </p>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <div>
-              <p className="text-xs font-semibold uppercase text-emerald-700">
+              <p className="text-xs font-semibold uppercase text-success">
                 Strengths
               </p>
-              <ul className="mt-2 list-inside list-disc text-sm text-slate-700">
+              <ul className="mt-2 list-inside list-disc text-sm text-foreground-secondary">
                 {data.enrichment.resumeStrengths.map((s) => (
                   <li key={s}>{s}</li>
                 ))}
               </ul>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase text-amber-800">
+              <p className="text-xs font-semibold uppercase" style={{ color: "var(--callout-warn-text)" }}>
                 Weaknesses
               </p>
-              <ul className="mt-2 list-inside list-disc text-sm text-slate-700">
+              <ul className="mt-2 list-inside list-disc text-sm text-foreground-secondary">
                 {data.enrichment.resumeWeaknesses.map((s) => (
                   <li key={s}>{s}</li>
                 ))}
@@ -317,10 +324,10 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
             </div>
           </div>
           <div className="mt-4">
-            <p className="text-xs font-semibold uppercase text-slate-600">
+            <p className="text-xs font-semibold uppercase text-foreground-muted">
               Fix next
             </p>
-            <ul className="mt-2 list-inside list-disc text-sm text-slate-700">
+            <ul className="mt-2 list-inside list-disc text-sm text-foreground-secondary">
               {data.enrichment.areasToFix.map((s) => (
                 <li key={s}>{s}</li>
               ))}
@@ -330,26 +337,26 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
       )}
 
       {data.enrichment && (
-        <section className="rounded-3xl border border-white/60 bg-white/40 p-6 shadow-glass backdrop-blur-2xl">
+        <section className="card p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">
+              <h2 className="section-heading">
                 Interview Prep & Negotiation
               </h2>
-              <p className="mt-1 text-xs text-slate-600">
+              <p className="section-desc mt-1">
                 AI-generated coaching based on your resume, brag sheet, and this
                 role.
               </p>
             </div>
-            <div className="inline-flex rounded-full border border-white/60 bg-white/45 p-1 backdrop-blur-xl">
+            <div className="inline-flex rounded-xl border border-border bg-surface p-1">
               <button
                 type="button"
                 onClick={() => setPrepTab("stories")}
                 className={cn(
-                  "min-h-[40px] rounded-full px-4 py-2 text-sm font-semibold transition-colors active:scale-[0.97]",
+                  "btn text-sm",
                   prepTab === "stories"
-                    ? "bg-indigo-600 text-white"
-                    : "text-slate-700 hover:bg-white/70"
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-transparent text-foreground-secondary hover:bg-surface-hover"
                 )}
               >
                 Interview Stories
@@ -358,10 +365,10 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
                 type="button"
                 onClick={() => setPrepTab("negotiation")}
                 className={cn(
-                  "min-h-[40px] rounded-full px-4 py-2 text-sm font-semibold transition-colors active:scale-[0.97]",
+                  "btn text-sm",
                   prepTab === "negotiation"
-                    ? "bg-emerald-600 text-white"
-                    : "text-slate-700 hover:bg-white/70"
+                    ? "border-success bg-success text-success-foreground"
+                    : "border-transparent text-foreground-secondary hover:bg-surface-hover"
                 )}
               >
                 Negotiation Scripts
@@ -375,10 +382,10 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
                 interviewStories.map((story, idx) => (
                   <article
                     key={`${story.title}-${idx}`}
-                    className="rounded-2xl border border-indigo-200/60 bg-indigo-50/45 p-4 backdrop-blur-xl"
+                    className="callout-info p-4"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-indigo-900">
+                      <p className="text-sm font-medium">
                         {idx + 1}. {story.title}
                       </p>
                       <button
@@ -389,7 +396,7 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
                             `story-${idx}`
                           )
                         }
-                        className="inline-flex min-h-[36px] items-center gap-1 rounded-full border border-indigo-300/60 bg-white/65 px-3 py-1.5 text-xs font-medium text-indigo-900 active:scale-[0.97]"
+                        className="btn-secondary text-xs"
                       >
                         {copied === `story-${idx}` ? (
                           <Check className="h-3.5 w-3.5" />
@@ -399,36 +406,27 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
                         Copy STAR
                       </button>
                     </div>
-                    <dl className="mt-3 space-y-2 text-sm text-slate-700">
-                      <div>
-                        <dt className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
-                          Situation
-                        </dt>
-                        <dd className="mt-0.5">{story.situation}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
-                          Task
-                        </dt>
-                        <dd className="mt-0.5">{story.task}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
-                          Action
-                        </dt>
-                        <dd className="mt-0.5">{story.action}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
-                          Result
-                        </dt>
-                        <dd className="mt-0.5">{story.result}</dd>
-                      </div>
+                    <dl className="mt-3 space-y-2 text-sm text-foreground-secondary">
+                      {(
+                        [
+                          ["Situation", story.situation],
+                          ["Task", story.task],
+                          ["Action", story.action],
+                          ["Result", story.result],
+                        ] as const
+                      ).map(([dt, dd]) => (
+                        <div key={dt}>
+                          <dt className="text-xs font-semibold uppercase tracking-wide opacity-80">
+                            {dt}
+                          </dt>
+                          <dd className="mt-0.5">{dd}</dd>
+                        </div>
+                      ))}
                     </dl>
                   </article>
                 ))
               ) : (
-                <p className="rounded-2xl border border-indigo-200/60 bg-indigo-50/45 px-4 py-3 text-sm text-indigo-900">
+                <p className="card-inset px-4 py-3 text-sm text-foreground-muted">
                   Interview stories are not available yet for this role.
                 </p>
               )}
@@ -439,16 +437,18 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
                 negotiationScripts.map((item, idx) => (
                   <article
                     key={`${item.scenario}-${idx}`}
-                    className="rounded-2xl border border-emerald-200/70 bg-emerald-50/45 p-4 backdrop-blur-xl"
+                    className="callout-success p-4"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-emerald-900">
+                      <p className="text-sm font-medium">
                         {item.scenario}
                       </p>
                       <button
                         type="button"
-                        onClick={() => void copyText(item.script, `neg-${idx}`)}
-                        className="inline-flex min-h-[36px] items-center gap-1 rounded-full border border-emerald-300/70 bg-white/65 px-3 py-1.5 text-xs font-medium text-emerald-900 active:scale-[0.97]"
+                        onClick={() =>
+                          void copyText(item.script, `neg-${idx}`)
+                        }
+                        className="btn-secondary text-xs"
                       >
                         {copied === `neg-${idx}` ? (
                           <Check className="h-3.5 w-3.5" />
@@ -458,13 +458,13 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
                         Copy script
                       </button>
                     </div>
-                    <pre className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-slate-700">
+                    <pre className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-foreground-secondary">
                       {item.script}
                     </pre>
                   </article>
                 ))
               ) : (
-                <p className="rounded-2xl border border-emerald-200/70 bg-emerald-50/45 px-4 py-3 text-sm text-emerald-900">
+                <p className="card-inset px-4 py-3 text-sm text-foreground-muted">
                   Negotiation scripts are not available yet for this role.
                 </p>
               )}
@@ -473,30 +473,28 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
         </section>
       )}
 
-      <section className="rounded-3xl border border-white/60 bg-white/40 p-6 shadow-glass backdrop-blur-2xl">
+      <section className="card p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-slate-900">
-            ATS-style résumé (5 tones)
-          </h2>
+          <h2 className="section-heading">ATS-style resume (5 tones)</h2>
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               disabled={pdfBusy || !selectedVariant}
               onClick={() => void downloadTailoredPdf()}
-              className={cn(
-                "inline-flex min-h-[44px] items-center gap-2 rounded-full border border-emerald-400/50 bg-emerald-600/90 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 active:scale-[0.97] disabled:opacity-50"
-              )}
+              className="btn-primary"
             >
-              {pdfBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+              {pdfBusy ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileDown className="h-4 w-4" />
+              )}
               Download Tailored ATS PDF
             </button>
             <button
               type="button"
               disabled={tonesBusy}
               onClick={() => void runTones()}
-              className={cn(
-                "inline-flex min-h-[44px] items-center gap-2 rounded-full border border-sky-400/50 bg-sky-500/90 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-600 active:scale-[0.97] disabled:opacity-50"
-              )}
+              className="btn-secondary"
             >
               {tonesBusy ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -505,9 +503,9 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
             </button>
           </div>
         </div>
-        <p className="mt-2 text-xs text-slate-600">
-          Plain text for pasting. Review before you submit applications. Choose a
-          tone, then download a client-side ATS PDF.
+        <p className="section-desc mt-1">
+          Plain text for pasting. Review before you submit applications. Choose
+          a tone, then download a client-side ATS PDF.
         </p>
         {tones && tones.length > 0 && (
           <div className="mt-4 space-y-4">
@@ -515,16 +513,16 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
               <div
                 key={t.tone}
                 className={cn(
-                  "rounded-2xl border border-white/50 bg-white/35 p-4 backdrop-blur-xl",
+                  "card-inset p-4",
                   selectedVariant?.tone === t.tone &&
-                    "border-emerald-300/80 bg-emerald-50/40"
+                    "border-primary/40 bg-primary-subtle"
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
                   <button
                     type="button"
                     onClick={() => setSelectedTone(t.tone)}
-                    className="text-sm font-semibold text-slate-900 hover:text-emerald-800"
+                    className="text-sm font-medium text-foreground hover:text-primary"
                   >
                     {t.tone}
                     {selectedVariant?.tone === t.tone ? " (Selected)" : ""}
@@ -533,14 +531,14 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
                     <button
                       type="button"
                       onClick={() => setSelectedTone(t.tone)}
-                      className="inline-flex min-h-[36px] items-center gap-1 rounded-full border border-white/60 bg-white/50 px-3 py-1.5 text-xs font-medium text-slate-800 active:scale-[0.97]"
+                      className="btn-secondary text-xs"
                     >
                       Use tone
                     </button>
                     <button
                       type="button"
                       onClick={() => void copyText(t.text, t.tone)}
-                      className="inline-flex min-h-[36px] items-center gap-1 rounded-full border border-white/60 bg-white/50 px-3 py-1.5 text-xs font-medium text-slate-800 active:scale-[0.97]"
+                      className="btn-secondary text-xs"
                     >
                       {copied === t.tone ? (
                         <Check className="h-3.5 w-3.5" />
@@ -551,7 +549,7 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
                     </button>
                   </div>
                 </div>
-                <pre className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-slate-700">
+                <pre className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-foreground-secondary">
                   {t.text}
                 </pre>
               </div>

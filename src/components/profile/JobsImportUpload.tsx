@@ -22,6 +22,9 @@ const GEMINI_MAP_MAX_CELL_CHARS = 6_000;
 /** Cap description length for `importUploadJobs` (each chunk must stay under host body limits). */
 const IMPORT_MAX_DESCRIPTION_CHARS = 12_000;
 
+/** Parallel Gemini map / import calls per wave — stay under API rate limits. */
+const MAP_IMPORT_CONCURRENCY = 4;
+
 type ParseResult = {
   rows: UploadJobInput[];
   errors: string[];
@@ -195,21 +198,34 @@ async function mapImportRowsWithGeminiInChunks(genericRows: GenericRow[]): Promi
   const mergedRows: UploadJobInput[] = [];
   const mergedAudit: ImportMappingAudit[] = [];
   const totalChunks = Math.ceil(genericRows.length / GEMINI_MAP_CHUNK_SIZE);
-  for (let c = 0; c < totalChunks; c += 1) {
+  const totalBatches = Math.ceil(totalChunks / MAP_IMPORT_CONCURRENCY);
+
+  for (let batchStart = 0; batchStart < totalChunks; batchStart += MAP_IMPORT_CONCURRENCY) {
+    const batchEnd = Math.min(batchStart + MAP_IMPORT_CONCURRENCY, totalChunks);
+    const batchNum = Math.floor(batchStart / MAP_IMPORT_CONCURRENCY) + 1;
     if (totalChunks > 1) {
-      toast.message(`Mapping schema: batch ${c + 1} of ${totalChunks}…`);
+      toast.message(
+        `Mapping schema: wave ${batchNum} of ${totalBatches} (chunks ${batchStart + 1}–${batchEnd} of ${totalChunks}, up to ${MAP_IMPORT_CONCURRENCY} in parallel)…`
+      );
     }
-    const slice = genericRows.slice(
-      c * GEMINI_MAP_CHUNK_SIZE,
-      (c + 1) * GEMINI_MAP_CHUNK_SIZE
+    const wave = await Promise.all(
+      Array.from({ length: batchEnd - batchStart }, (_, i) => {
+        const c = batchStart + i;
+        const slice = genericRows.slice(
+          c * GEMINI_MAP_CHUNK_SIZE,
+          (c + 1) * GEMINI_MAP_CHUNK_SIZE
+        );
+        const trimmed = truncateGenericRowCells(slice, GEMINI_MAP_MAX_CELL_CHARS);
+        return mapImportRowsWithGemini(trimmed);
+      })
     );
-    const trimmed = truncateGenericRowCells(slice, GEMINI_MAP_MAX_CELL_CHARS);
-    const aiMap = await mapImportRowsWithGemini(trimmed);
-    if (!aiMap.ok) {
-      return { ok: false, message: aiMap.error.message };
+    for (const aiMap of wave) {
+      if (!aiMap.ok) {
+        return { ok: false, message: aiMap.error.message };
+      }
+      mergedRows.push(...aiMap.rows);
+      mergedAudit.push(...aiMap.audit);
     }
-    mergedRows.push(...aiMap.rows);
-    mergedAudit.push(...aiMap.audit);
   }
   return { ok: true, rows: mergedRows, audit: mergedAudit };
 }
@@ -363,22 +379,33 @@ export function JobsImportUpload({
       let aiConsidered = 0;
       let aiMatched = 0;
       let skippedInvalid = 0;
-      for (let c = 0; c < chunks.length; c += 1) {
+      const importBatches = Math.ceil(chunks.length / MAP_IMPORT_CONCURRENCY);
+      for (let batchStart = 0; batchStart < chunks.length; batchStart += MAP_IMPORT_CONCURRENCY) {
+        const batchEnd = Math.min(batchStart + MAP_IMPORT_CONCURRENCY, chunks.length);
+        const waveNum = Math.floor(batchStart / MAP_IMPORT_CONCURRENCY) + 1;
         if (chunks.length > 1) {
-          toast.message(`Importing batch ${c + 1} of ${chunks.length}…`);
+          toast.message(
+            `Importing wave ${waveNum} of ${importBatches} (chunks ${batchStart + 1}–${batchEnd} of ${chunks.length}, up to ${MAP_IMPORT_CONCURRENCY} in parallel)…`
+          );
         }
-        const result = await importUploadJobs({
-          jobs: truncateJobsForImportPayload(chunks[c]),
-          minRelevance: minRel,
-        });
-        if (!result.ok) {
-          toast.error(result.error);
-          return;
+        const results = await Promise.all(
+          chunks.slice(batchStart, batchEnd).map((chunk) =>
+            importUploadJobs({
+              jobs: truncateJobsForImportPayload(chunk),
+              minRelevance: minRel,
+            })
+          )
+        );
+        for (const result of results) {
+          if (!result.ok) {
+            toast.error(result.error);
+            return;
+          }
+          addedCount += result.addedCount;
+          aiConsidered += result.aiConsidered;
+          aiMatched += result.aiMatched;
+          skippedInvalid += result.skippedInvalid;
         }
-        addedCount += result.addedCount;
-        aiConsidered += result.aiConsidered;
-        aiMatched += result.aiMatched;
-        skippedInvalid += result.skippedInvalid;
       }
       toast.success(
         `Imported ${addedCount} jobs. AI matched ${aiMatched}/${aiConsidered}.`
@@ -398,16 +425,15 @@ export function JobsImportUpload({
   }
 
   return (
-    <section className="rounded-3xl border border-white/60 bg-white/40 p-6 shadow-glass backdrop-blur-2xl">
-      <h3 className="text-lg font-semibold text-slate-900">Import jobs (CSV or JSON)</h3>
-      <p className="mt-1 text-sm text-slate-600">
+    <section className="card p-5">
+      <h3 className="section-heading">Import jobs (CSV or JSON)</h3>
+      <p className="section-desc mt-1">
         Upload a file, then we filter by your saved preferences and AI relevance before adding to your board.
       </p>
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <label
           className={cn(
-            "inline-flex min-h-[44px] w-full cursor-pointer items-center justify-center gap-2 rounded-full border border-white/60 bg-white/50 px-4 py-2.5 text-xs font-semibold text-slate-800 shadow-sm backdrop-blur-xl transition-all duration-300 sm:w-auto",
-            "hover:bg-white/70",
+            "btn-secondary w-full cursor-pointer sm:w-auto",
             busy && "cursor-not-allowed opacity-60"
           )}
         >
@@ -425,28 +451,28 @@ export function JobsImportUpload({
             }}
           />
         </label>
-        <label className="text-xs font-medium text-slate-600">
+        <label className="label">
           Min AI relevance (0-100)
           <input
             value={minRelevance}
             onChange={(e) => setMinRelevance(e.target.value)}
             inputMode="numeric"
-            className="ml-2 w-20 rounded-xl border border-white/60 bg-white/50 px-2 py-1 text-sm text-slate-900"
+            className="input ml-2 inline-block w-20"
           />
         </label>
         <button
           type="button"
           disabled={!canImport}
           onClick={() => void onImport()}
-          className="inline-flex min-h-[44px] w-full items-center justify-center rounded-full border border-sky-400/50 bg-sky-500/90 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition-all duration-300 hover:bg-sky-600 disabled:opacity-50 sm:w-auto"
+          className="btn-primary w-full sm:w-auto"
         >
           {busy ? "Processing..." : `Import ${rows.length || ""}`.trim()}
         </button>
       </div>
 
       {sample.length > 0 && (
-        <div className="mt-4 rounded-2xl border border-white/50 bg-white/35 p-3 text-xs text-slate-700">
-          <p className="font-semibold text-slate-900">Preview</p>
+        <div className="card-inset mt-4 p-3 text-xs text-foreground-secondary">
+          <p className="font-medium text-foreground">Preview</p>
           <ul className="mt-2 space-y-1">
             {sample.map((r) => (
               <li key={`${r.company}-${r.role}-${r.link}`}>{r.role} at {r.company}</li>
@@ -456,8 +482,8 @@ export function JobsImportUpload({
       )}
 
       {mappingAudit.length > 0 && (
-        <div className="mt-4 rounded-2xl border border-blue-200/80 bg-blue-50/80 p-3 text-xs text-blue-900">
-          <p className="font-semibold">AI mapping report</p>
+        <div className="callout-info mt-4">
+          <p className="font-medium">AI mapping report</p>
           <ul className="mt-2 space-y-1">
             {mappingAudit.slice(0, 10).map((a, i) => (
               <li key={`${a.field}-${i}`}>
@@ -472,7 +498,7 @@ export function JobsImportUpload({
       )}
 
       {errors.length > 0 && (
-        <div className="mt-4 rounded-2xl border border-amber-200/80 bg-amber-50/90 p-3 text-xs text-amber-900">
+        <div className="callout-warn mt-4 text-xs">
           {errors.slice(0, 4).map((e) => (
             <p key={e}>{e}</p>
           ))}

@@ -12,11 +12,11 @@ type RadialScoreProps = {
 export function RadialScore({
   percentage,
   className,
-  size = 144,
+  size = 128,
 }: RadialScoreProps) {
   const gradId = `agentix-score-${useId().replace(/:/g, "")}`;
   const pct = Math.min(100, Math.max(0, Math.round(percentage)));
-  const stroke = 10;
+  const stroke = 8;
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const offset = c - (pct / 100) * c;
@@ -38,7 +38,7 @@ export function RadialScore({
           cy={size / 2}
           r={r}
           fill="none"
-          stroke="rgba(148, 163, 184, 0.35)"
+          stroke="var(--border)"
           strokeWidth={stroke}
         />
         <circle
@@ -55,18 +55,18 @@ export function RadialScore({
         />
         <defs>
           <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.95" />
-            <stop offset="55%" stopColor="#2563eb" stopOpacity="0.95" />
-            <stop offset="100%" stopColor="#10b981" stopOpacity="0.95" />
+            <stop offset="0%" stopColor="#6366f1" stopOpacity="0.9" />
+            <stop offset="50%" stopColor="#818cf8" stopOpacity="0.9" />
+            <stop offset="100%" stopColor="#34d399" stopOpacity="0.9" />
           </linearGradient>
         </defs>
       </svg>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-        <p className="text-3xl font-semibold tabular-nums text-slate-900">
+        <p className="text-3xl font-semibold tabular-nums text-foreground">
           {pct}
-          <span className="text-lg font-semibold text-slate-500">%</span>
+          <span className="text-lg font-medium text-foreground-muted">%</span>
         </p>
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+        <p className="kicker">
           ATS match
         </p>
       </div>

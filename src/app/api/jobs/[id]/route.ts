@@ -35,29 +35,25 @@ function buildListingPayload(
     typeof (body.ctcRange as Record<string, unknown>).high === "number" &&
     typeof (body.ctcRange as Record<string, unknown>).currency === "string"
   ) {
+    const br = body.ctcRange as Record<string, unknown>;
+    const confRaw = br.confidence;
+    const confidence =
+      confRaw === "HIGH" || confRaw === "MID" || confRaw === "LOW"
+        ? confRaw
+        : undefined;
     data.rawPayload = {
       ctcRange: {
-        low: Math.round(
-          Number((body.ctcRange as Record<string, unknown>).low)
-        ),
-        mid: Math.round(
-          Number((body.ctcRange as Record<string, unknown>).mid)
-        ),
-        high: Math.round(
-          Number((body.ctcRange as Record<string, unknown>).high)
-        ),
-        currency: String(
-          (body.ctcRange as Record<string, unknown>).currency
-        ),
+        low: Math.round(Number(br.low)),
+        mid: Math.round(Number(br.mid)),
+        high: Math.round(Number(br.high)),
+        currency: String(br.currency),
         period:
-          (body.ctcRange as Record<string, unknown>).period === "MONTHLY"
-            ? "MONTHLY"
-            : "YEARLY",
+          br.period === "MONTHLY" ? ("MONTHLY" as const) : ("YEARLY" as const),
         format:
-          (body.ctcRange as Record<string, unknown>).format === "LPA" ||
-          (body.ctcRange as Record<string, unknown>).format === "K"
-            ? String((body.ctcRange as Record<string, unknown>).format)
+          br.format === "LPA" || br.format === "K"
+            ? String(br.format)
             : "RAW",
+        ...(confidence ? { confidence } : {}),
       },
     };
   }

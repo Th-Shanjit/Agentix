@@ -8,6 +8,11 @@ import { cn } from "@/lib/cn";
 import { useTheme } from "@/components/providers/ThemeProvider";
 import { clearActiveSessionCookie } from "@/lib/browser-session";
 
+const fab =
+  "pointer-events-auto inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium shadow-card backdrop-blur-xl transition-colors duration-150 active:scale-[0.97]";
+const fabSecondary = cn(fab, "border-border bg-surface-overlay text-foreground");
+const fabPrimary = cn(fab, "border-transparent bg-primary text-primary-foreground");
+
 export function TopActions() {
   const { status } = useSession();
   const { theme, toggleTheme } = useTheme();
@@ -68,7 +73,7 @@ export function TopActions() {
   }
 
   return (
-    <div className="pointer-events-none fixed right-3 top-[max(0.6rem,env(safe-area-inset-top))] z-[70] flex flex-col items-end gap-2 md:right-4">
+    <div className="pointer-events-none fixed right-3 top-[max(0.5rem,env(safe-area-inset-top))] z-[70] flex flex-col items-end gap-1.5 md:right-4">
       {status === "authenticated" && (
         <button
           type="button"
@@ -81,17 +86,17 @@ export function TopActions() {
               setSigningOut(false)
             );
           }}
-          className="pointer-events-auto inline-flex min-h-[44px] items-center gap-2 rounded-full border border-white/20 bg-[#19181A]/70 px-4 py-2.5 text-xs font-semibold text-slate-100 shadow-sm backdrop-blur-xl transition-all duration-300 hover:bg-[#19181A]/85 active:scale-[0.97] disabled:cursor-wait disabled:opacity-70"
+          className={cn(
+            fabSecondary,
+            "disabled:cursor-wait disabled:opacity-70"
+          )}
         >
           <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} />
           {signingOut ? "…" : "Sign out"}
         </button>
       )}
       {status === "unauthenticated" && (
-        <Link
-          href="/login"
-          className="pointer-events-auto inline-flex min-h-[44px] items-center gap-2 rounded-full border border-[#479761]/50 bg-[#479761]/90 px-4 py-2.5 text-xs font-semibold text-white shadow-sm backdrop-blur-xl transition-all duration-300 hover:bg-[#3d8254] active:scale-[0.97]"
-        >
+        <Link href="/login" className={fabPrimary}>
           <LogIn className="h-3.5 w-3.5" strokeWidth={1.75} />
           Sign in
         </Link>
@@ -99,8 +104,10 @@ export function TopActions() {
       <button
         type="button"
         onClick={toggleTheme}
-        aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-        className="pointer-events-auto inline-flex min-h-[44px] items-center gap-2 rounded-full border border-white/20 bg-[#19181A]/70 px-4 py-2.5 text-xs font-semibold text-slate-100 shadow-sm backdrop-blur-xl transition-all duration-300 hover:bg-[#19181A]/85 active:scale-[0.97]"
+        aria-label={
+          theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+        }
+        className={fabSecondary}
       >
         {theme === "dark" ? (
           <Sun className="h-3.5 w-3.5" strokeWidth={1.75} />
@@ -114,8 +121,11 @@ export function TopActions() {
         onClick={jump}
         aria-label={goTop ? "Scroll to top" : "Scroll to bottom"}
         className={cn(
-          "pointer-events-auto inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-[#479761]/50 bg-[#479761]/90 px-4 py-2.5 text-xs font-semibold text-white shadow-sm backdrop-blur-xl transition-all duration-300 hover:bg-[#3d8254] active:scale-[0.97]",
-          isScrolling ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0 pointer-events-none"
+          fabPrimary,
+          "transition-all duration-200",
+          isScrolling
+            ? "translate-y-0 opacity-100"
+            : "pointer-events-none translate-y-1 opacity-0"
         )}
       >
         {goTop ? (

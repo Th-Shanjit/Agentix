@@ -13,9 +13,9 @@ export function AppToaster() {
       toastOptions={{
         classNames: {
           toast:
-            "border border-white/60 bg-white/50 backdrop-blur-xl shadow-glass text-slate-800",
-          title: "font-semibold",
-          description: "text-slate-600",
+            "border border-border bg-surface-overlay backdrop-blur-xl shadow-card text-foreground",
+          title: "font-medium",
+          description: "text-foreground-secondary",
         },
       }}
     />

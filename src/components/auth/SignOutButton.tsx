@@ -17,7 +17,7 @@ export function SignOutButton() {
         clearActiveSessionCookie();
         void signOut({ callbackUrl: "/login" }).catch(() => setBusy(false));
       }}
-      className="inline-flex items-center gap-2 rounded-full border border-white/60 bg-white/45 px-4 py-2 text-sm font-medium text-slate-800 shadow-sm backdrop-blur-xl transition-all duration-300 hover:bg-white/60 disabled:cursor-wait disabled:opacity-70"
+      className="btn-secondary text-sm disabled:cursor-wait"
     >
       <LogOut className="h-4 w-4" strokeWidth={1.75} />
       {busy ? "Signing out…" : "Sign out"}

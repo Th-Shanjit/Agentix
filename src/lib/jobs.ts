@@ -1,5 +1,14 @@
 import type { JobListing, UserJob } from "@prisma/client";
 
+function ctcConfidenceFromRaw(
+  v: unknown
+): "LOW" | "MID" | "HIGH" | undefined {
+  if (typeof v !== "string") return undefined;
+  const u = v.trim().toUpperCase();
+  if (u === "HIGH" || u === "MID" || u === "LOW") return u;
+  return undefined;
+}
+
 /** Serializable job shape for client components. `id` is the shared `JobListing` id. */
 export type JobDTO = {
   id: string;
@@ -20,6 +29,8 @@ export type JobDTO = {
     currency: string;
     period: "YEARLY" | "MONTHLY";
     format: "LPA" | "K" | "RAW";
+    /** Estimate reliability (not numeric spread). */
+    confidence?: "LOW" | "MID" | "HIGH";
   } | null;
   notYetListed?: boolean;
   location?: string | null;
@@ -66,37 +77,24 @@ export function toJobDTOFromJoin(
         (jl.rawPayload as { ctcRange: Record<string, unknown> }).ctcRange
           .currency
       ) === "string"
-        ? {
-            low: Number(
-              (jl.rawPayload as { ctcRange: Record<string, unknown> }).ctcRange
-                .low
-            ),
-            mid: Number(
-              (jl.rawPayload as { ctcRange: Record<string, unknown> }).ctcRange
-                .mid
-            ),
-            high: Number(
-              (jl.rawPayload as { ctcRange: Record<string, unknown> }).ctcRange
-                .high
-            ),
-            currency: String(
-              (jl.rawPayload as { ctcRange: Record<string, unknown> }).ctcRange
-                .currency
-            ),
-            period:
-              (jl.rawPayload as { ctcRange: Record<string, unknown> }).ctcRange
-                .period === "MONTHLY"
-                ? "MONTHLY"
-                : "YEARLY",
-            format:
-              (jl.rawPayload as { ctcRange: Record<string, unknown> }).ctcRange
-                .format === "LPA" ||
-              (jl.rawPayload as { ctcRange: Record<string, unknown> }).ctcRange
-                .format === "K"
-                ? (jl.rawPayload as { ctcRange: { format: "LPA" | "K" } })
-                    .ctcRange.format
-                : "RAW",
-          }
+        ? (() => {
+            const cr = (jl.rawPayload as { ctcRange: Record<string, unknown> })
+              .ctcRange;
+            const conf = ctcConfidenceFromRaw(cr.confidence);
+            return {
+              low: Number(cr.low),
+              mid: Number(cr.mid),
+              high: Number(cr.high),
+              currency: String(cr.currency),
+              period:
+                cr.period === "MONTHLY" ? ("MONTHLY" as const) : ("YEARLY" as const),
+              format:
+                cr.format === "LPA" || cr.format === "K"
+                  ? (cr.format as "LPA" | "K")
+                  : ("RAW" as const),
+              ...(conf ? { confidence: conf } : {}),
+            };
+          })()
         : null,
     relevanceScore:
       jl.rawPayload &&
@@ -219,21 +217,23 @@ export function normalizeJobFromApi(data: unknown): JobDTO | null {
     typeof (j.ctcRange as Record<string, unknown>).mid === "number" &&
     typeof (j.ctcRange as Record<string, unknown>).high === "number" &&
     typeof (j.ctcRange as Record<string, unknown>).currency === "string"
-      ? {
-          low: (j.ctcRange as Record<string, number>).low,
-          mid: (j.ctcRange as Record<string, number>).mid,
-          high: (j.ctcRange as Record<string, number>).high,
-          currency: (j.ctcRange as Record<string, string>).currency,
-          period:
-            (j.ctcRange as Record<string, unknown>).period === "MONTHLY"
-              ? "MONTHLY"
-              : "YEARLY",
-          format:
-            (j.ctcRange as Record<string, unknown>).format === "LPA" ||
-            (j.ctcRange as Record<string, unknown>).format === "K"
-              ? ((j.ctcRange as Record<string, "LPA" | "K">).format ?? "RAW")
-              : "RAW",
-        }
+      ? (() => {
+          const cr = j.ctcRange as Record<string, unknown>;
+          const conf = ctcConfidenceFromRaw(cr.confidence);
+          return {
+            low: cr.low as number,
+            mid: cr.mid as number,
+            high: cr.high as number,
+            currency: cr.currency as string,
+            period:
+              cr.period === "MONTHLY" ? ("MONTHLY" as const) : ("YEARLY" as const),
+            format:
+              cr.format === "LPA" || cr.format === "K"
+                ? (cr.format as "LPA" | "K")
+                : "RAW",
+            ...(conf ? { confidence: conf } : {}),
+          };
+        })()
       : null;
   const archetype =
     j.archetype === null || j.archetype === undefined

@@ -51,70 +51,73 @@ function LoginForm({ defaultCallbackUrl }: LoginClientProps) {
   }
 
   return (
-    <div className="relative flex min-h-dvh items-center justify-center bg-[var(--shell-bg)] px-4 py-12">
+    <div className="relative flex min-h-dvh items-center justify-center bg-shell-bg px-4 py-12">
       <GlassBackground />
-      <div className="relative z-10 w-full max-w-md">
+      <div className="relative z-10 w-full max-w-sm">
         <div className="mb-8 text-center">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-            Agentix
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-100">
+          <p className="kicker tracking-widest">Agentix</p>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
             Sign in
           </h1>
-          <p className="mt-2 text-sm text-slate-300">
+          <p className="mt-2 text-sm text-foreground-secondary">
             Email and password. Your data is scoped to your account.
           </p>
         </div>
 
-        <div className="rounded-3xl border border-white/15 bg-[#19181A]/75 p-6 shadow-glass backdrop-blur-2xl transition-all duration-300">
-          <form onSubmit={(e) => void handlePasswordSignIn(e)} className="space-y-3">
-            <label className="block text-xs font-medium text-slate-300">
-              Email
+        <div className="card p-6">
+          <form
+            onSubmit={(e) => void handlePasswordSignIn(e)}
+            className="space-y-4"
+          >
+            <div>
+              <label htmlFor="login-email" className="label">
+                Email
+              </label>
               <input
+                id="login-email"
                 type="email"
                 required
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@company.com"
-                className="mt-1 w-full rounded-full border border-white/20 bg-white/10 px-4 py-3 text-base text-slate-100 shadow-inner backdrop-blur-xl outline-none transition-all duration-300 placeholder:text-slate-400 focus:border-[#A16E83]/80"
+                className="input mt-1.5"
               />
-            </label>
-            <label className="block text-xs font-medium text-slate-300">
-              Password
+            </div>
+            <div>
+              <label htmlFor="login-password" className="label">
+                Password
+              </label>
               <input
+                id="login-password"
                 type="password"
                 required
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 w-full rounded-full border border-white/20 bg-white/10 px-4 py-3 text-base text-slate-100 shadow-inner backdrop-blur-xl outline-none transition-all duration-300 placeholder:text-slate-400 focus:border-[#A16E83]/80"
+                className="input mt-1.5"
               />
-            </label>
-            <button
-              type="submit"
-              disabled={busy}
-              className="min-h-[48px] w-full rounded-full border border-[#479761]/40 bg-[#479761]/90 py-3 text-base font-semibold text-white shadow-md backdrop-blur-xl transition-all duration-300 hover:bg-[#3d8254] active:scale-[0.98] disabled:opacity-60"
-            >
+            </div>
+            <button type="submit" disabled={busy} className="btn-primary w-full">
               {busy ? "Signing in…" : "Sign in"}
             </button>
           </form>
 
-          <p className="mt-4 text-center text-sm text-slate-400">
+          <p className="mt-5 text-center text-sm text-foreground-secondary">
             New here?{" "}
             <Link
               href={`/register?callbackUrl=${encodeURIComponent(callbackUrl)}`}
-              className="font-semibold text-[#A16E83] hover:underline"
+              className="font-medium text-primary hover:underline"
             >
               Create an account
             </Link>
           </p>
 
           {message && (
-            <p className="mt-4 text-center text-sm text-red-400">{message}</p>
+            <p className="mt-4 text-center text-sm" style={{ color: "var(--callout-error-text)" }}>{message}</p>
           )}
           {!message && authError && (
-            <p className="mt-4 text-center text-sm text-red-400">
+            <p className="mt-4 text-center text-sm" style={{ color: "var(--callout-error-text)" }}>
               Sign-in failed ({authError}). Please try again.
             </p>
           )}
@@ -128,7 +131,7 @@ export function LoginClient(props: LoginClientProps) {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-dvh items-center justify-center bg-[var(--shell-bg)] text-sm text-slate-300">
+        <div className="flex min-h-dvh items-center justify-center bg-shell-bg text-sm text-foreground-secondary">
           Loading…
         </div>
       }

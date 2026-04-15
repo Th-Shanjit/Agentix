@@ -3,7 +3,6 @@ import type { Config } from "tailwindcss";
 const config: Config = {
   darkMode: ["selector", '[data-theme="dark"]'],
   content: [
-    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
@@ -18,12 +17,40 @@ const config: Config = {
         ],
       },
       colors: {
+        surface: {
+          DEFAULT: "var(--surface)",
+          hover: "var(--surface-hover)",
+          inset: "var(--surface-inset)",
+          overlay: "var(--surface-overlay)",
+        },
+        border: "var(--border)",
+        ring: "var(--ring)",
+        foreground: {
+          DEFAULT: "var(--foreground)",
+          secondary: "var(--foreground-secondary)",
+          muted: "var(--foreground-muted)",
+        },
+        primary: {
+          DEFAULT: "var(--primary)",
+          hover: "var(--primary-hover)",
+          foreground: "var(--primary-foreground)",
+          subtle: "var(--primary-subtle)",
+        },
+        success: {
+          DEFAULT: "var(--success)",
+          foreground: "var(--success-foreground)",
+          subtle: "var(--success-subtle)",
+        },
         shell: {
-          bg: "#e0e5ec",
+          bg: "var(--shell-bg)",
         },
       },
+      borderRadius: {
+        card: "0.875rem",
+      },
       boxShadow: {
-        glass: "0 8px 32px rgba(31, 38, 135, 0.08)",
+        card: "var(--shadow-card)",
+        "card-hover": "var(--shadow-card-hover)",
       },
     },
   },

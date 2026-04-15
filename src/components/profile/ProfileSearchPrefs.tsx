@@ -60,39 +60,46 @@ export function ProfileSearchPrefs({
   }
 
   return (
-    <section className="rounded-3xl border border-white/60 bg-white/40 p-6 shadow-glass backdrop-blur-2xl">
-      <h3 className="text-lg font-semibold text-slate-900">Job preferences</h3>
-      <p className="mt-1 text-sm text-slate-600">
+    <section className="card p-5">
+      <h3 className="section-heading">Job preferences</h3>
+      <p className="section-desc mt-1">
         Preferences used when AI filters and tidies imported jobs.
       </p>
       <form onSubmit={onSubmit} className="mt-4 space-y-4">
-        <label className="block text-xs font-medium text-slate-600">
-          Years of experience
+        <div>
+          <label htmlFor="pref-years" className="label">
+            Years of experience
+          </label>
           <input
+            id="pref-years"
             inputMode="numeric"
             value={years}
             onChange={(e) => setYears(e.target.value)}
             placeholder="e.g. 5"
-            className="mt-1 w-full max-w-xs rounded-2xl border border-white/60 bg-white/50 px-3 py-3 text-base text-slate-900 backdrop-blur-xl sm:py-2 sm:text-sm"
+            className="input mt-1.5 max-w-xs"
           />
-        </label>
-        <label className="block text-xs font-medium text-slate-600">
-          Preferred countries (comma-separated)
+        </div>
+        <div>
+          <label htmlFor="pref-countries" className="label">
+            Preferred countries (comma-separated)
+          </label>
           <input
+            id="pref-countries"
             value={countries}
             onChange={(e) => setCountries(e.target.value)}
             placeholder="India, Germany"
-            className="mt-1 w-full max-w-lg rounded-2xl border border-white/60 bg-white/50 px-3 py-3 text-base text-slate-900 backdrop-blur-xl sm:py-2 sm:text-sm"
+            className="input mt-1.5 max-w-lg"
           />
-        </label>
-        <label className="block text-xs font-medium text-slate-600">
-          Work mode
+        </div>
+        <div>
+          <label htmlFor="pref-remote" className="label">
+            Work mode
+          </label>
           <select
+            id="pref-remote"
             value={remote}
-            onChange={(e) =>
-              setRemote(e.target.value as RemotePreference)
-            }
-            className="mt-1 block w-full max-w-xs rounded-2xl border border-white/60 bg-white/50 px-3 py-3 text-base text-slate-900 backdrop-blur-xl sm:py-2 sm:text-sm"
+            onChange={(e) => setRemote(e.target.value as RemotePreference)}
+            className="input mt-1.5 max-w-xs"
           >
             {REMOTE_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -100,32 +107,35 @@ export function ProfileSearchPrefs({
               </option>
             ))}
           </select>
-        </label>
-        <label className="block text-xs font-medium text-slate-600">
-          Preferred roles for alerts (comma-separated)
+        </div>
+        <div>
+          <label htmlFor="pref-roles" className="label">
+            Preferred roles for alerts (comma-separated)
+          </label>
           <input
+            id="pref-roles"
             value={roles}
             onChange={(e) => setRoles(e.target.value)}
             placeholder="Associate Product Manager, Junior Product Manager"
-            className="mt-1 w-full max-w-lg rounded-2xl border border-white/60 bg-white/50 px-3 py-3 text-base text-slate-900 backdrop-blur-xl sm:py-2 sm:text-sm"
+            className="input mt-1.5 max-w-lg"
           />
-          <span className="mt-1 block text-[11px] text-slate-500">
+          <span className="mt-1.5 block text-xs text-foreground-muted">
             Daily email alerts use these roles to detect relevant openings.
           </span>
-        </label>
-        <label className="flex min-h-[44px] items-center gap-3 text-sm font-medium text-slate-600">
+        </div>
+        <label className="flex min-h-[44px] items-center gap-3 text-sm font-medium text-foreground-secondary">
           <input
             type="checkbox"
             checked={alertEmailsEnabled}
             onChange={(e) => setAlertEmailsEnabled(e.target.checked)}
-            className="h-5 w-5 rounded border-white/60 bg-white/50"
+            className="h-4 w-4 rounded border-border accent-primary"
           />
           Enable daily alert emails
         </label>
         <button
           type="submit"
           disabled={busy}
-          className="min-h-[44px] w-full rounded-full border border-sky-400/50 bg-sky-500/90 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-600 active:scale-[0.98] disabled:opacity-50 sm:w-auto"
+          className="btn-primary w-full sm:w-auto"
         >
           {busy ? "Saving…" : "Save preferences"}
         </button>

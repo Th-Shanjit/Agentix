@@ -15,7 +15,7 @@ export function MobileBottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/15 bg-[#19181A]/85 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-glass backdrop-blur-2xl md:hidden [padding-left:max(0.5rem,env(safe-area-inset-left))] [padding-right:max(0.5rem,env(safe-area-inset-right))]"
+      className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-surface-overlay px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-2xl md:hidden [padding-left:max(0.5rem,env(safe-area-inset-left))] [padding-right:max(0.5rem,env(safe-area-inset-right))]"
       aria-label="Primary"
     >
       <ul className="mx-auto flex max-w-md items-stretch justify-around gap-1">
@@ -27,10 +27,10 @@ export function MobileBottomNav() {
               <Link
                 href={href}
                 className={cn(
-                  "flex min-h-[48px] min-w-[48px] flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 text-[11px] font-medium transition-all duration-300 active:scale-[0.98]",
+                  "flex min-h-[48px] min-w-[48px] flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5 text-xs font-medium transition-colors duration-150 active:scale-[0.97]",
                   active
-                    ? "bg-white/15 text-slate-100 shadow-sm"
-                    : "text-slate-300 active:bg-white/10 hover:bg-white/10 hover:text-slate-100"
+                    ? "bg-primary-subtle text-primary"
+                    : "text-foreground-muted hover:text-foreground"
                 )}
               >
                 <Icon className="h-5 w-5" strokeWidth={1.75} />

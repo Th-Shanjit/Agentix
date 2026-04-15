@@ -107,19 +107,39 @@ export function mapGeminiException(e: unknown, fallback: string): GeminiError {
   );
 }
 
-export function getGeminiModel() {
+/** Reliability of a CTC band (not the numeric spread). */
+export type CtcConfidenceLevel = "LOW" | "MID" | "HIGH";
+
+/** How trustworthy the salary band is — not the width of the numeric band. */
+export function parseCtcConfidence(value: unknown): CtcConfidenceLevel {
+  if (typeof value !== "string") return "LOW";
+  const u = value.trim().toUpperCase();
+  if (u === "HIGH" || u === "MID" || u === "LOW") return u;
+  return "LOW";
+}
+
+/**
+ * @param useSearch When true, enables Google Search grounding (higher latency).
+ *   Use only for flows that need live market/web data (e.g. job enrichment, CTC estimates).
+ */
+export function getGeminiModel(useSearch = false) {
   const key = process.env.GEMINI_API_KEY;
   if (!key?.trim()) {
     throw new Error("GEMINI_API_KEY is not configured.");
   }
   const genAI = new GoogleGenerativeAI(key);
-  // Prefer native Google Search grounding when this model version supports it.
+  const base = { model: MODEL_FAST };
+
+  if (!useSearch) {
+    return genAI.getGenerativeModel(base);
+  }
+
   try {
     return genAI.getGenerativeModel({
-      model: MODEL_FAST,
+      ...base,
       tools: [{ googleSearch: {} }],
     } as unknown as Parameters<typeof genAI.getGenerativeModel>[0]);
   } catch {
-    return genAI.getGenerativeModel({ model: MODEL_FAST });
+    return genAI.getGenerativeModel(base);
   }
 }

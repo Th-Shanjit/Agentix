@@ -2,28 +2,119 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Light theme (default) ─────────────────────────────────── */
 :root {
-  --shell-bg: #19181A;
-  color-scheme: dark;
-}
-
-html[data-theme="light"] {
-  --shell-bg: #B19F9E;
   color-scheme: light;
+  --shell-bg: #f1f5f9;
+
+  --surface: rgba(255, 255, 255, 0.78);
+  --surface-hover: rgba(255, 255, 255, 0.92);
+  --surface-inset: rgba(241, 245, 249, 0.70);
+  --surface-overlay: rgba(255, 255, 255, 0.95);
+
+  --border: rgba(0, 0, 0, 0.08);
+  --ring: rgba(99, 102, 241, 0.40);
+
+  --foreground: #0f172a;
+  --foreground-secondary: #475569;
+  --foreground-muted: #64748b;
+
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --primary-foreground: #ffffff;
+  --primary-subtle: rgba(99, 102, 241, 0.08);
+
+  --success: #059669;
+  --success-foreground: #ffffff;
+  --success-subtle: rgba(16, 185, 129, 0.08);
+
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
+  --shadow-card-hover: 0 4px 12px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.05);
+
+  --callout-warn-bg: #fffbeb;
+  --callout-warn-border: rgba(217, 169, 56, 0.30);
+  --callout-warn-text: #92400e;
+
+  --callout-error-bg: #fef2f2;
+  --callout-error-border: rgba(239, 68, 68, 0.25);
+  --callout-error-text: #991b1b;
+
+  --callout-info-bg: #eef2ff;
+  --callout-info-border: rgba(99, 102, 241, 0.20);
+  --callout-info-text: #3730a3;
+
+  --callout-success-bg: #ecfdf5;
+  --callout-success-border: rgba(16, 185, 129, 0.20);
+  --callout-success-text: #065f46;
+
+  --badge-amber-bg: #fef3c7;
+  --badge-amber-border: rgba(217, 169, 56, 0.35);
+  --badge-amber-text: #92400e;
 }
 
+/* ── Dark theme ────────────────────────────────────────────── */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --shell-bg: #0c0c0e;
+
+  --surface: rgba(255, 255, 255, 0.05);
+  --surface-hover: rgba(255, 255, 255, 0.09);
+  --surface-inset: rgba(0, 0, 0, 0.20);
+  --surface-overlay: rgba(20, 20, 23, 0.95);
+
+  --border: rgba(255, 255, 255, 0.09);
+  --ring: rgba(129, 140, 248, 0.45);
+
+  --foreground: #e2e8f0;
+  --foreground-secondary: #94a3b8;
+  --foreground-muted: #64748b;
+
+  --primary: #818cf8;
+  --primary-hover: #6366f1;
+  --primary-foreground: #0f172a;
+  --primary-subtle: rgba(129, 140, 248, 0.10);
+
+  --success: #34d399;
+  --success-foreground: #022c22;
+  --success-subtle: rgba(52, 211, 153, 0.10);
+
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.30), 0 1px 2px rgba(0,0,0,0.20);
+  --shadow-card-hover: 0 4px 16px rgba(0,0,0,0.40), 0 2px 4px rgba(0,0,0,0.25);
+
+  --callout-warn-bg: rgba(217, 169, 56, 0.10);
+  --callout-warn-border: rgba(217, 169, 56, 0.20);
+  --callout-warn-text: #fcd34d;
+
+  --callout-error-bg: rgba(239, 68, 68, 0.10);
+  --callout-error-border: rgba(239, 68, 68, 0.20);
+  --callout-error-text: #fca5a5;
+
+  --callout-info-bg: rgba(99, 102, 241, 0.10);
+  --callout-info-border: rgba(129, 140, 248, 0.20);
+  --callout-info-text: #a5b4fc;
+
+  --callout-success-bg: rgba(16, 185, 129, 0.10);
+  --callout-success-border: rgba(52, 211, 153, 0.20);
+  --callout-success-text: #6ee7b7;
+
+  --badge-amber-bg: rgba(217, 169, 56, 0.15);
+  --badge-amber-border: rgba(217, 169, 56, 0.25);
+  --badge-amber-text: #fcd34d;
+}
+
+/* ── Base resets ───────────────────────────────────────────── */
 html {
   @apply antialiased;
   overflow-x: hidden;
 }
 
 body {
-  @apply min-h-dvh text-slate-100;
+  @apply min-h-dvh;
   background-color: var(--shell-bg);
+  color: var(--foreground);
   overflow-x: hidden;
 }
 
-/* Prevent iOS Safari from zooming into inputs with small font sizes */
 @supports (-webkit-touch-callout: none) {
   input,
   textarea,
@@ -32,7 +123,6 @@ body {
   }
 }
 
-/* Hide scrollbar on horizontal-scroll containers while keeping scroll functional */
 .scrollbar-none {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -41,99 +131,117 @@ body {
   display: none;
 }
 
-/* Smooth focus for glass UI */
 *:focus-visible {
-  @apply outline-none ring-2 ring-[#A16E83]/60 ring-offset-2 ring-offset-[#19181A];
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--shell-bg),
+    0 0 0 4px var(--ring);
 }
 
-html[data-theme="light"] body {
-  color: rgb(30 41 59);
-}
+/* ── Reusable component layers ─────────────────────────────── */
+@layer components {
+  .card {
+    @apply rounded-card border border-border bg-surface backdrop-blur-xl;
+    box-shadow: var(--shadow-card);
+  }
 
-html[data-theme="light"] *:focus-visible {
-  @apply ring-offset-[#B19F9E];
-}
+  .card-inset {
+    @apply rounded-card border border-border bg-surface-inset;
+  }
 
-/* Explicit theme tokens for shared shell components (safer than wildcard class overrides). */
-html[data-theme="dark"] {
-  color-scheme: dark;
-  --surface-bg: rgb(25 24 26 / 0.75);
-  --surface-border: rgb(255 255 255 / 0.16);
-  --surface-text: rgb(226 232 240);
-  --surface-muted: rgb(148 163 184);
-}
+  .btn {
+    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors duration-150 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 sm:min-h-[36px] sm:py-2;
+  }
 
-html[data-theme="light"] {
-  --surface-bg: rgb(255 255 255 / 0.58);
-  --surface-border: rgb(255 255 255 / 0.72);
-  --surface-text: rgb(30 41 59);
-  --surface-muted: rgb(71 85 105);
-}
+  .btn-primary {
+    @apply btn border-transparent bg-primary text-primary-foreground;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background-color: var(--primary-hover);
+  }
 
-.surface-card {
-  background-color: var(--surface-bg);
-  border-color: var(--surface-border);
-}
+  .btn-secondary {
+    @apply btn border-border bg-surface text-foreground;
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background-color: var(--surface-hover);
+  }
 
-.surface-text {
-  color: var(--surface-text);
-}
+  .btn-ghost {
+    @apply btn border-transparent bg-transparent text-foreground-secondary;
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background-color: var(--surface-hover);
+  }
 
-.surface-muted {
-  color: var(--surface-muted);
-}
+  .btn-danger {
+    @apply btn;
+    background-color: var(--callout-error-bg);
+    border-color: var(--callout-error-border);
+    color: var(--callout-error-text);
+  }
 
-html[data-theme="dark"] .bg-white\/60,
-html[data-theme="dark"] .bg-white\/55,
-html[data-theme="dark"] .bg-white\/50,
-html[data-theme="dark"] .bg-white\/45,
-html[data-theme="dark"] .bg-white\/40,
-html[data-theme="dark"] .bg-white\/35,
-html[data-theme="dark"] .bg-white\/30,
-html[data-theme="dark"] .bg-white\/25,
-html[data-theme="dark"] .bg-white\/20 {
-  background-color: rgb(25 24 26 / 0.68);
-}
+  .input {
+    @apply w-full rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-foreground transition-colors duration-150 placeholder:text-foreground-muted disabled:opacity-60 sm:py-2;
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(12px);
+  }
+  .input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow:
+      var(--shadow-card),
+      0 0 0 3px var(--ring);
+  }
 
-html[data-theme="dark"] .border-white\/70,
-html[data-theme="dark"] .border-white\/60,
-html[data-theme="dark"] .border-white\/50 {
-  border-color: rgb(255 255 255 / 0.16);
-}
+  .label {
+    @apply block text-xs font-medium text-foreground-secondary;
+  }
 
-html[data-theme="dark"] .text-slate-900,
-html[data-theme="dark"] .text-slate-800,
-html[data-theme="dark"] .text-slate-700,
-html[data-theme="dark"] .text-slate-600 {
-  color: rgb(226 232 240);
-}
+  .section-heading {
+    @apply text-xl font-semibold tracking-tight text-foreground;
+  }
 
-html[data-theme="dark"] .text-slate-500 {
-  color: rgb(148 163 184);
-}
+  .section-desc {
+    @apply text-sm text-foreground-secondary;
+  }
 
-html[data-theme="dark"] .bg-sky-500\/90 {
-  background-color: rgb(71 151 97 / 0.9);
-}
+  .callout-warn {
+    @apply rounded-xl px-4 py-3 text-sm;
+    background-color: var(--callout-warn-bg);
+    border: 1px solid var(--callout-warn-border);
+    color: var(--callout-warn-text);
+  }
 
-html[data-theme="dark"] .border-sky-400\/50,
-html[data-theme="dark"] .border-sky-300\/50 {
-  border-color: rgb(71 151 97 / 0.5);
-}
+  .callout-error {
+    @apply rounded-xl px-4 py-3 text-sm;
+    background-color: var(--callout-error-bg);
+    border: 1px solid var(--callout-error-border);
+    color: var(--callout-error-text);
+  }
 
-html[data-theme="light"] .bg-\[\#19181A\]\/85,
-html[data-theme="light"] .bg-\[\#19181A\]\/75,
-html[data-theme="light"] .bg-\[\#19181A\]\/70 {
-  background-color: rgb(255 255 255 / 0.6);
-}
+  .callout-info {
+    @apply rounded-xl px-3 py-2.5 text-xs;
+    background-color: var(--callout-info-bg);
+    border: 1px solid var(--callout-info-border);
+    color: var(--callout-info-text);
+  }
 
-html[data-theme="light"] .border-white\/20,
-html[data-theme="light"] .border-white\/15 {
-  border-color: rgb(255 255 255 / 0.72);
-}
+  .callout-success {
+    @apply rounded-xl px-4 py-3 text-sm;
+    background-color: var(--callout-success-bg);
+    border: 1px solid var(--callout-success-border);
+    color: var(--callout-success-text);
+  }
 
-html[data-theme="light"] .text-slate-100,
-html[data-theme="light"] .text-slate-200,
-html[data-theme="light"] .text-slate-300 {
-  color: rgb(30 41 59);
+  .kicker {
+    @apply text-[10px] font-semibold uppercase tracking-wider text-foreground-muted;
+  }
+
+  .badge-amber {
+    @apply rounded-md px-1.5 py-0.5 text-[10px] font-bold;
+    background-color: var(--badge-amber-bg);
+    border: 1px solid var(--badge-amber-border);
+    color: var(--badge-amber-text);
+  }
 }

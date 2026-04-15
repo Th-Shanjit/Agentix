@@ -13,7 +13,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   /** Default UI chrome matches dark shell; light mode still overrides via `data-theme`. */
-  themeColor: "#19181A",
+  themeColor: "#0c0c0e",
 };
 
 export const metadata: Metadata = {

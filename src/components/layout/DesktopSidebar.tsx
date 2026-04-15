@@ -24,13 +24,14 @@ export function DesktopSidebar() {
     (status === "authenticated" ? "Signed in" : null);
 
   return (
-    <aside className="hidden md:flex md:w-64 md:flex-col md:gap-2 md:px-4 md:py-6">
+    <aside className="hidden md:flex md:w-60 md:flex-col md:gap-2 md:px-4 md:py-6">
       <div className="mb-6 px-2">
-        <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-          Agentix
-        </p>
-        <h1 className="mt-1 text-lg font-semibold text-slate-100">Career hub</h1>
+        <p className="kicker tracking-widest">Agentix</p>
+        <h1 className="mt-1 text-lg font-semibold text-foreground">
+          Career hub
+        </h1>
       </div>
+
       <nav className="flex flex-1 flex-col gap-1">
         {nav.map(({ href, label, icon: Icon }) => {
           const active =
@@ -40,33 +41,34 @@ export function DesktopSidebar() {
               key={href}
               href={href}
               className={cn(
-                "flex items-center gap-3 rounded-full border px-4 py-3 text-sm font-medium transition-all duration-300",
+                "flex items-center gap-3 rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors duration-150",
                 active
-                  ? "border-white/20 bg-white/10 text-slate-100 shadow-glass backdrop-blur-2xl"
-                  : "border-transparent bg-white/5 text-slate-300 backdrop-blur-xl hover:border-white/20 hover:bg-white/10 hover:text-slate-100"
+                  ? "border-primary/20 bg-primary-subtle text-foreground"
+                  : "border-transparent text-foreground-secondary hover:bg-surface-hover hover:text-foreground"
               )}
             >
-              <Icon className="h-5 w-5 shrink-0 opacity-80" strokeWidth={1.75} />
+              <Icon className="h-5 w-5 shrink-0 opacity-75" strokeWidth={1.75} />
               {label}
             </Link>
           );
         })}
       </nav>
-      <div className="mt-auto space-y-3 rounded-2xl border border-white/15 bg-white/10 p-4 text-xs text-slate-300 shadow-glass backdrop-blur-2xl">
-        {status === "loading" && <p className="animate-pulse">Loading session…</p>}
+
+      <div className="mt-auto card space-y-3 p-4 text-xs text-foreground-secondary">
+        {status === "loading" && (
+          <p className="animate-pulse">Loading session…</p>
+        )}
         {status === "authenticated" && display && (
           <>
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                Account
-              </p>
-              <p className="mt-1 line-clamp-2 text-sm font-medium text-slate-100">
+              <p className="kicker">Account</p>
+              <p className="mt-1 line-clamp-2 text-sm font-medium text-foreground">
                 {display}
               </p>
               {session?.user?.email &&
                 display &&
                 session.user.email !== display && (
-                  <p className="mt-0.5 line-clamp-2 text-[11px] text-slate-400">
+                  <p className="mt-0.5 line-clamp-2 text-xs text-foreground-muted">
                     {session.user.email}
                   </p>
                 )}
@@ -82,7 +84,7 @@ export function DesktopSidebar() {
                   setSigningOut(false)
                 );
               }}
-              className="flex w-full items-center justify-center gap-2 rounded-full border border-white/20 bg-white/10 py-2 text-xs font-semibold text-slate-100 backdrop-blur-xl transition-all duration-300 hover:bg-white/20 disabled:cursor-wait disabled:opacity-70"
+              className="btn-secondary w-full text-xs"
             >
               <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} />
               {signingOut ? "Signing out…" : "Sign out"}
@@ -90,10 +92,7 @@ export function DesktopSidebar() {
           </>
         )}
         {status === "unauthenticated" && (
-          <Link
-            href="/login"
-            className="flex w-full items-center justify-center rounded-full border border-[#479761]/40 bg-[#479761]/90 py-2.5 text-xs font-semibold text-white transition-all duration-300 hover:bg-[#3d8254]"
-          >
+          <Link href="/login" className="btn-primary w-full text-xs">
             Sign in
           </Link>
         )}

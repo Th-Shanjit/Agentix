@@ -51,25 +51,21 @@ export default async function ProfilePage() {
 
   return (
     <div className="space-y-6">
-      <header className="rounded-3xl border border-white/60 bg-white/40 p-6 shadow-glass backdrop-blur-2xl transition-all duration-300">
-        <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
-          Résumé
-        </h2>
-        <p className="mt-2 max-w-2xl text-sm text-slate-600">
-          PDF → text in your browser. We use it for Search match scores and job
+      <header className="card p-5">
+        <h2 className="section-heading text-2xl">Resume</h2>
+        <p className="section-desc mt-1.5 max-w-2xl">
+          PDF to text in your browser. We use it for Search match scores and job
           pages.
         </p>
         {session?.user && (
-          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-white/50 pt-4 text-sm text-slate-700">
+          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4 text-sm text-foreground-secondary">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                Signed in as
-              </p>
-              <p className="font-medium text-slate-900">
+              <p className="label">Signed in as</p>
+              <p className="mt-0.5 font-medium text-foreground">
                 {session.user.name ?? session.user.email ?? session.user.id}
               </p>
               {session.user.name && session.user.email && (
-                <p className="text-slate-600">{session.user.email}</p>
+                <p className="text-foreground-muted">{session.user.email}</p>
               )}
             </div>
             <SignOutButton />
