@@ -13,6 +13,7 @@ import {
 const MAX_RESUME = 28_000;
 const MAX_DESC = 8_000;
 
+/** Mirrors `geminiJsonRequest` in `src/actions/gemini.ts` — forces `application/json` responses. */
 function geminiJsonRequest(prompt: string) {
   return {
     contents: [{ role: "user" as const, parts: [{ text: prompt }] }],
@@ -85,7 +86,7 @@ Candidate roles: ${JSON.stringify(candidateRoles)}
 Output a JSON array of strings: candidate roles from the list above that are close enough to consider relevant.
 Include junior/senior/intern/associate variations if they are in the same domain.`;
   try {
-    const model = getGeminiModel();
+    const model = getGeminiModel(false);
     const result = await model.generateContent(geminiJsonRequest(prompt));
     const raw = result.response.text().trim();
     const arr = extractJsonArray(raw);
@@ -229,7 +230,7 @@ Use the career highlights as high-signal evidence when present.
 If uncertain, still output best-effort numbers.`;
 
   try {
-    const model = getGeminiModel();
+    const model = getGeminiModel(false);
     const result = await model.generateContent(geminiJsonRequest(prompt));
     const raw = result.response.text().trim();
     const arr = extractJsonArray(raw);
@@ -326,7 +327,7 @@ Rows:
 ${JSON.stringify(sample)}`;
 
   try {
-    const model = getGeminiModel();
+    const model = getGeminiModel(false);
     const result = await model.generateContent(geminiJsonRequest(prompt));
     const raw = result.response.text().trim();
     const obj = extractJsonObject(raw);
@@ -420,7 +421,7 @@ Rules:
 - If uncertain, return best effort with non-empty title/company when possible.`;
 
   try {
-    const model = getGeminiModel();
+    const model = getGeminiModel(false);
     const result = await model.generateContent(geminiJsonRequest(prompt));
     const raw = result.response.text().trim();
     const obj = extractJsonObject(raw);
@@ -742,7 +743,7 @@ Tones must be: "Neutral", "Confident", "Concise", "Narrative", "Executive"
 Each "text" is full résumé body plain text, ready to paste.`;
 
   try {
-    const model = getGeminiModel();
+    const model = getGeminiModel(false);
     const result = await model.generateContent(geminiJsonRequest(prompt));
     const raw = result.response.text().trim();
     const arr = extractJsonArray(raw);
@@ -846,7 +847,7 @@ export async function extractExperienceYearsBatch(
   const MAX_TEXT = 6000;
 
   try {
-    const model = getGeminiModel();
+    const model = getGeminiModel(false);
     const subChunks: (typeof needModel)[] = [];
     for (let i = 0; i < needModel.length; i += CHUNK) {
       subChunks.push(needModel.slice(i, i + CHUNK));
