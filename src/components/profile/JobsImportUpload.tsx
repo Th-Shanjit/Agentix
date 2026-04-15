@@ -11,7 +11,16 @@ import {
 import { cn } from "@/lib/cn";
 
 /** Keeps each Server Action POST under platform body limits (long descriptions dominate size). */
-const IMPORT_JOBS_CHUNK_SIZE = 150;
+const IMPORT_JOBS_CHUNK_SIZE = 45;
+
+/** AI mapping sends `rows` as the RPC body — the server only maps a slice; the full array must be chunked client-side. */
+const GEMINI_MAP_CHUNK_SIZE = 35;
+
+/** Avoid huge cells in generic CSV/JSON rows blowing the Server Action payload. */
+const GEMINI_MAP_MAX_CELL_CHARS = 6_000;
+
+/** Cap description length for `importUploadJobs` (each chunk must stay under host body limits). */
+const IMPORT_MAX_DESCRIPTION_CHARS = 12_000;
 
 type ParseResult = {
   rows: UploadJobInput[];
@@ -152,6 +161,59 @@ function parseCsvToGenericRows(text: string): { rows: GenericRow[]; errors: stri
   return { rows, errors: [] };
 }
 
+function truncateGenericRowCells(rows: GenericRow[], maxChars: number): GenericRow[] {
+  return rows.map((row) => {
+    const next: GenericRow = {};
+    for (const [k, v] of Object.entries(row)) {
+      if (typeof v === "string" && v.length > maxChars) {
+        next[k] = v.slice(0, maxChars);
+      } else {
+        next[k] = v;
+      }
+    }
+    return next;
+  });
+}
+
+function truncateJobsForImportPayload(jobs: UploadJobInput[]): UploadJobInput[] {
+  return jobs.map((j) => {
+    const d = j.description;
+    if (d && d.length > IMPORT_MAX_DESCRIPTION_CHARS) {
+      return { ...j, description: d.slice(0, IMPORT_MAX_DESCRIPTION_CHARS) };
+    }
+    return j;
+  });
+}
+
+async function mapImportRowsWithGeminiInChunks(genericRows: GenericRow[]): Promise<
+  | { ok: true; rows: UploadJobInput[]; audit: ImportMappingAudit[] }
+  | { ok: false; message: string }
+> {
+  if (genericRows.length === 0) {
+    return { ok: true, rows: [], audit: [] };
+  }
+  const mergedRows: UploadJobInput[] = [];
+  const mergedAudit: ImportMappingAudit[] = [];
+  const totalChunks = Math.ceil(genericRows.length / GEMINI_MAP_CHUNK_SIZE);
+  for (let c = 0; c < totalChunks; c += 1) {
+    if (totalChunks > 1) {
+      toast.message(`Mapping schema: batch ${c + 1} of ${totalChunks}…`);
+    }
+    const slice = genericRows.slice(
+      c * GEMINI_MAP_CHUNK_SIZE,
+      (c + 1) * GEMINI_MAP_CHUNK_SIZE
+    );
+    const trimmed = truncateGenericRowCells(slice, GEMINI_MAP_MAX_CELL_CHARS);
+    const aiMap = await mapImportRowsWithGemini(trimmed);
+    if (!aiMap.ok) {
+      return { ok: false, message: aiMap.error.message };
+    }
+    mergedRows.push(...aiMap.rows);
+    mergedAudit.push(...aiMap.audit);
+  }
+  return { ok: true, rows: mergedRows, audit: mergedAudit };
+}
+
 function parseJson(text: string): ParseResult {
   try {
     const parsed: unknown = JSON.parse(text);
@@ -257,7 +319,7 @@ export function JobsImportUpload({
           : parseCsvToGenericRows(text).rows;
 
         if (genericRows.length > 0) {
-          const aiMap = await mapImportRowsWithGemini(genericRows);
+          const aiMap = await mapImportRowsWithGeminiInChunks(genericRows);
           if (aiMap.ok) {
             finalRows = aiMap.rows;
             audit = aiMap.audit;
@@ -265,7 +327,7 @@ export function JobsImportUpload({
               toast.message("Used AI schema mapping to normalize this file.");
             }
           } else {
-            finalErrors.push(aiMap.error.message);
+            finalErrors.push(aiMap.message);
           }
         }
       }
@@ -306,7 +368,7 @@ export function JobsImportUpload({
           toast.message(`Importing batch ${c + 1} of ${chunks.length}…`);
         }
         const result = await importUploadJobs({
-          jobs: chunks[c],
+          jobs: truncateJobsForImportPayload(chunks[c]),
           minRelevance: minRel,
         });
         if (!result.ok) {
