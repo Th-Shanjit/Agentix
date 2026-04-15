@@ -10,6 +10,9 @@ import {
 } from "@/actions/gemini-job-features";
 import { cn } from "@/lib/cn";
 
+/** Keeps each Server Action POST under platform body limits (long descriptions dominate size). */
+const IMPORT_JOBS_CHUNK_SIZE = 150;
+
 type ParseResult = {
   rows: UploadJobInput[];
   errors: string[];
@@ -289,19 +292,37 @@ export function JobsImportUpload({
     setBusy(true);
     try {
       const threshold = Number.parseInt(minRelevance, 10);
-      const result = await importUploadJobs({
-        jobs: rows,
-        minRelevance: Number.isNaN(threshold) ? 60 : threshold,
-      });
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
+      const minRel = Number.isNaN(threshold) ? 60 : threshold;
+      const chunks: UploadJobInput[][] = [];
+      for (let i = 0; i < rows.length; i += IMPORT_JOBS_CHUNK_SIZE) {
+        chunks.push(rows.slice(i, i + IMPORT_JOBS_CHUNK_SIZE));
+      }
+      let addedCount = 0;
+      let aiConsidered = 0;
+      let aiMatched = 0;
+      let skippedInvalid = 0;
+      for (let c = 0; c < chunks.length; c += 1) {
+        if (chunks.length > 1) {
+          toast.message(`Importing batch ${c + 1} of ${chunks.length}…`);
+        }
+        const result = await importUploadJobs({
+          jobs: chunks[c],
+          minRelevance: minRel,
+        });
+        if (!result.ok) {
+          toast.error(result.error);
+          return;
+        }
+        addedCount += result.addedCount;
+        aiConsidered += result.aiConsidered;
+        aiMatched += result.aiMatched;
+        skippedInvalid += result.skippedInvalid;
       }
       toast.success(
-        `Imported ${result.addedCount} jobs. AI matched ${result.aiMatched}/${result.aiConsidered}.`
+        `Imported ${addedCount} jobs. AI matched ${aiMatched}/${aiConsidered}.`
       );
-      if (result.skippedInvalid > 0) {
-        toast.message(`${result.skippedInvalid} rows were skipped as invalid.`);
+      if (skippedInvalid > 0) {
+        toast.message(`${skippedInvalid} rows were skipped as invalid.`);
       }
       setRows([]);
       setErrors([]);
