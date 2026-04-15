@@ -7,6 +7,7 @@ import { Briefcase, Plus, RefreshCw, Search } from "lucide-react";
 import { toast } from "sonner";
 import { addManualJob, toggleJobAppliedStatus } from "@/actions/jobs";
 import {
+  batchEstimateCTC,
   estimateCTC,
   matchResumeATS,
   type AtsMatchResult,
@@ -454,50 +455,99 @@ export function JobBoard({
       return;
     }
     setBulkEstimating(true);
-    let success = 0;
-    let failed = 0;
-    for (const job of bulkEligible) {
-      try {
-        const r = await estimateCTC(job.role, job.company, job.location, {
-          inrOnly: true,
-        });
-        if (!r.ok || !r.range) {
-          failed += 1;
-          continue;
-        }
-        const res = await fetch(`/api/jobs/${job.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ctc: r.text, ctcRange: r.range }),
-        });
-        if (!res.ok) {
-          failed += 1;
-          continue;
-        }
-        const raw: unknown = await res.json();
-        const updated = normalizeJobFromApi(raw);
-        if (updated) {
-          setJobs((list) =>
-            list.map((j) =>
-              j.id === updated.id
-                ? { ...j, ...updated, ctcRange: r.range, ctc: r.text }
-                : j
-            )
-          );
-        }
-        success += 1;
-      } catch {
-        failed += 1;
+    try {
+      const inputs = bulkEligible.map((j) => ({
+        id: j.id,
+        jobRole: j.role,
+        company: j.company,
+        location: j.location ?? undefined,
+      }));
+
+      const batchResult = await batchEstimateCTC(inputs, { inrOnly: true });
+      if (!batchResult.ok) {
+        toast.error(batchResult.error.message);
+        return;
       }
-    }
-    setBulkEstimating(false);
-    toast.success(
-      `CTC estimated for ${success} listing${success === 1 ? "" : "s"}.`
-    );
-    if (failed > 0) {
-      toast.message(
-        `${failed} listing${failed === 1 ? "" : "s"} could not be estimated.`
+
+      const rowsWithRange = batchResult.rows.filter(
+        (r): r is typeof r & { range: NonNullable<typeof r.range> } =>
+          r.range != null
       );
+      let failed = batchResult.rows.length - rowsWithRange.length;
+      let success = 0;
+
+      const saved: Array<{
+        id: string;
+        text: string;
+        range: NonNullable<JobDTO["ctcRange"]>;
+        normalized: JobDTO;
+      }> = [];
+
+      const chunkSize = 5;
+      for (let i = 0; i < rowsWithRange.length; i += chunkSize) {
+        const chunk = rowsWithRange.slice(i, i + chunkSize);
+        const outcomes = await Promise.all(
+          chunk.map(async (row) => {
+            try {
+              const res = await fetch(`/api/jobs/${row.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  ctc: row.summary,
+                  ctcRange: row.range,
+                }),
+              });
+              if (!res.ok) return null;
+              const raw: unknown = await res.json();
+              const normalized = normalizeJobFromApi(raw);
+              if (!normalized) return null;
+              return {
+                id: row.id,
+                text: row.summary,
+                range: row.range,
+                normalized,
+              };
+            } catch {
+              return null;
+            }
+          })
+        );
+        for (const o of outcomes) {
+          if (o) {
+            success += 1;
+            saved.push(o);
+          } else {
+            failed += 1;
+          }
+        }
+      }
+
+      if (saved.length > 0) {
+        const byId = new Map(saved.map((s) => [s.id, s]));
+        setJobs((list) =>
+          list.map((j) => {
+            const s = byId.get(j.id);
+            if (!s) return j;
+            return {
+              ...j,
+              ...s.normalized,
+              ctcRange: s.range,
+              ctc: s.text,
+            };
+          })
+        );
+      }
+
+      toast.success(
+        `CTC estimated for ${success} listing${success === 1 ? "" : "s"}.`
+      );
+      if (failed > 0) {
+        toast.message(
+          `${failed} listing${failed === 1 ? "" : "s"} could not be estimated.`
+        );
+      }
+    } finally {
+      setBulkEstimating(false);
     }
   }, [bulkEligible]);
 
