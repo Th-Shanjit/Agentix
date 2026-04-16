@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ExternalLink, Loader2, Copy, Check, FileDown } from "lucide-react";
 import { toast } from "sonner";
@@ -36,9 +36,24 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
     return null;
   });
   const [copied, setCopied] = useState<string | null>(null);
-  const [selectedTone, setSelectedTone] = useState<string | null>(null);
+  const [selectedTone, setSelectedTone] = useState<string | null>(() => {
+    const raw = initial.enrichment?.fiveToneResumes;
+    if (Array.isArray(raw)) {
+      const v = raw.filter(
+        (x): x is { tone: string; text: string } =>
+          x &&
+          typeof x === "object" &&
+          typeof (x as { tone?: string }).tone === "string" &&
+          typeof (x as { text?: string }).text === "string"
+      );
+      return v[0]?.tone ?? null;
+    }
+    return null;
+  });
   const [pdfBusy, setPdfBusy] = useState(false);
   const [prepTab, setPrepTab] = useState<"stories" | "negotiation">("stories");
+  const [storyTabIdx, setStoryTabIdx] = useState(0);
+  const [negotiationTabIdx, setNegotiationTabIdx] = useState(0);
   const pdfRef = useRef<HTMLDivElement | null>(null);
 
   const bands = data.enrichment?.ctcBands as
@@ -102,6 +117,18 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
         )
         .slice(0, 3)
     : [];
+
+  useEffect(() => {
+    if (storyTabIdx >= interviewStories.length) {
+      setStoryTabIdx(0);
+    }
+  }, [interviewStories.length, storyTabIdx]);
+
+  useEffect(() => {
+    if (negotiationTabIdx >= negotiationScripts.length) {
+      setNegotiationTabIdx(0);
+    }
+  }, [negotiationScripts.length, negotiationTabIdx]);
 
   const selectedVariant = useMemo(() => {
     if (!tones || tones.length === 0) return null;
@@ -340,9 +367,7 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
         <section className="card p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="section-heading">
-                Interview Prep & Negotiation
-              </h2>
+              <h2 className="section-heading">Interview & Prep</h2>
               <p className="section-desc mt-1">
                 AI-generated coaching based on your resume, brag sheet, and this
                 role.
@@ -379,52 +404,80 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
           {prepTab === "stories" ? (
             <div className="mt-4 space-y-3">
               {interviewStories.length > 0 ? (
-                interviewStories.map((story, idx) => (
-                  <article
-                    key={`${story.title}-${idx}`}
-                    className="callout-info p-4"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-medium">
-                        {idx + 1}. {story.title}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void copyText(
-                            `Title: ${story.title}\n\nSituation: ${story.situation}\n\nTask: ${story.task}\n\nAction: ${story.action}\n\nResult: ${story.result}`,
-                            `story-${idx}`
-                          )
-                        }
-                        className="btn-secondary text-xs"
-                      >
-                        {copied === `story-${idx}` ? (
-                          <Check className="h-3.5 w-3.5" />
-                        ) : (
-                          <Copy className="h-3.5 w-3.5" />
-                        )}
-                        Copy STAR
-                      </button>
+                <>
+                  {interviewStories.length > 1 && (
+                    <div className="-mx-1 overflow-x-auto px-1 scrollbar-none">
+                      <div className="flex min-w-max gap-1 rounded-xl border border-border bg-surface p-1">
+                        {interviewStories.map((story, idx) => (
+                          <button
+                            key={`story-tab-${idx}`}
+                            type="button"
+                            onClick={() => setStoryTabIdx(idx)}
+                            className={cn(
+                              "btn shrink-0 text-xs",
+                              storyTabIdx === idx
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-transparent text-foreground-secondary hover:bg-surface-hover"
+                            )}
+                            title={story.title}
+                          >
+                            <span className="max-w-[10rem] truncate">
+                              {idx + 1}. {story.title}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <dl className="mt-3 space-y-2 text-sm text-foreground-secondary">
-                      {(
-                        [
-                          ["Situation", story.situation],
-                          ["Task", story.task],
-                          ["Action", story.action],
-                          ["Result", story.result],
-                        ] as const
-                      ).map(([dt, dd]) => (
-                        <div key={dt}>
-                          <dt className="text-xs font-semibold uppercase tracking-wide opacity-80">
-                            {dt}
-                          </dt>
-                          <dd className="mt-0.5">{dd}</dd>
+                  )}
+                  {(() => {
+                    const idx = Math.min(storyTabIdx, interviewStories.length - 1);
+                    const story = interviewStories[idx];
+                    if (!story) return null;
+                    return (
+                      <article className="callout-info p-4">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium">
+                            {idx + 1}. {story.title}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void copyText(
+                                `Title: ${story.title}\n\nSituation: ${story.situation}\n\nTask: ${story.task}\n\nAction: ${story.action}\n\nResult: ${story.result}`,
+                                `story-${idx}`
+                              )
+                            }
+                            className="btn-secondary text-xs"
+                          >
+                            {copied === `story-${idx}` ? (
+                              <Check className="h-3.5 w-3.5" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}
+                            Copy STAR
+                          </button>
                         </div>
-                      ))}
-                    </dl>
-                  </article>
-                ))
+                        <dl className="mt-3 space-y-2 text-sm text-foreground-secondary">
+                          {(
+                            [
+                              ["Situation", story.situation],
+                              ["Task", story.task],
+                              ["Action", story.action],
+                              ["Result", story.result],
+                            ] as const
+                          ).map(([dt, dd]) => (
+                            <div key={dt}>
+                              <dt className="text-xs font-semibold uppercase tracking-wide opacity-80">
+                                {dt}
+                              </dt>
+                              <dd className="mt-0.5">{dd}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </article>
+                    );
+                  })()}
+                </>
               ) : (
                 <p className="card-inset px-4 py-3 text-sm text-foreground-muted">
                   Interview stories are not available yet for this role.
@@ -434,35 +487,62 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
           ) : (
             <div className="mt-4 space-y-3">
               {negotiationScripts.length > 0 ? (
-                negotiationScripts.map((item, idx) => (
-                  <article
-                    key={`${item.scenario}-${idx}`}
-                    className="callout-success p-4"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-medium">
-                        {item.scenario}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void copyText(item.script, `neg-${idx}`)
-                        }
-                        className="btn-secondary text-xs"
-                      >
-                        {copied === `neg-${idx}` ? (
-                          <Check className="h-3.5 w-3.5" />
-                        ) : (
-                          <Copy className="h-3.5 w-3.5" />
-                        )}
-                        Copy script
-                      </button>
+                <>
+                  {negotiationScripts.length > 1 && (
+                    <div className="-mx-1 overflow-x-auto px-1 scrollbar-none">
+                      <div className="flex min-w-max gap-1 rounded-xl border border-border bg-surface p-1">
+                        {negotiationScripts.map((item, idx) => (
+                          <button
+                            key={`neg-tab-${idx}`}
+                            type="button"
+                            onClick={() => setNegotiationTabIdx(idx)}
+                            className={cn(
+                              "btn shrink-0 text-xs",
+                              negotiationTabIdx === idx
+                                ? "border-success bg-success text-success-foreground"
+                                : "border-transparent text-foreground-secondary hover:bg-surface-hover"
+                            )}
+                            title={item.scenario}
+                          >
+                            <span className="max-w-[10rem] truncate">
+                              Script {idx + 1}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <pre className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-foreground-secondary">
-                      {item.script}
-                    </pre>
-                  </article>
-                ))
+                  )}
+                  {(() => {
+                    const idx = Math.min(
+                      negotiationTabIdx,
+                      negotiationScripts.length - 1
+                    );
+                    const item = negotiationScripts[idx];
+                    if (!item) return null;
+                    return (
+                      <article className="callout-success p-4">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium">{item.scenario}</p>
+                          <button
+                            type="button"
+                            onClick={() => void copyText(item.script, `neg-${idx}`)}
+                            className="btn-secondary text-xs"
+                          >
+                            {copied === `neg-${idx}` ? (
+                              <Check className="h-3.5 w-3.5" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}
+                            Copy script
+                          </button>
+                        </div>
+                        <pre className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-foreground-secondary">
+                          {item.script}
+                        </pre>
+                      </article>
+                    );
+                  })()}
+                </>
               ) : (
                 <p className="card-inset px-4 py-3 text-sm text-foreground-muted">
                   Negotiation scripts are not available yet for this role.
@@ -505,55 +585,53 @@ export function JobDetailView({ initial, jobListingId }: JobDetailViewProps) {
         </div>
         <p className="section-desc mt-1">
           Plain text for pasting. Review before you submit applications. Choose
-          a tone, then download a client-side ATS PDF.
+          a tone tab, then download a client-side ATS PDF or copy the text.
         </p>
         {tones && tones.length > 0 && (
-          <div className="mt-4 space-y-4">
-            {tones.map((t) => (
-              <div
-                key={t.tone}
-                className={cn(
-                  "card-inset p-4",
-                  selectedVariant?.tone === t.tone &&
-                    "border-primary/40 bg-primary-subtle"
-                )}
-              >
-                <div className="flex items-center justify-between gap-2">
+          <div className="mt-4 space-y-3">
+            <div className="-mx-1 overflow-x-auto px-1 scrollbar-none">
+              <div className="flex min-w-max gap-1 rounded-xl border border-border bg-surface p-1">
+                {tones.map((t) => (
                   <button
+                    key={t.tone}
                     type="button"
                     onClick={() => setSelectedTone(t.tone)}
-                    className="text-sm font-medium text-foreground hover:text-primary"
+                    className={cn(
+                      "btn shrink-0 text-xs",
+                      selectedVariant?.tone === t.tone
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-transparent text-foreground-secondary hover:bg-surface-hover"
+                    )}
                   >
                     {t.tone}
-                    {selectedVariant?.tone === t.tone ? " (Selected)" : ""}
                   </button>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedTone(t.tone)}
-                      className="btn-secondary text-xs"
-                    >
-                      Use tone
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void copyText(t.text, t.tone)}
-                      className="btn-secondary text-xs"
-                    >
-                      {copied === t.tone ? (
-                        <Check className="h-3.5 w-3.5" />
-                      ) : (
-                        <Copy className="h-3.5 w-3.5" />
-                      )}
-                      Copy
-                    </button>
-                  </div>
+                ))}
+              </div>
+            </div>
+            {selectedVariant && (
+              <div className="card-inset border-primary/20 bg-primary-subtle/30 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-medium text-foreground">
+                    {selectedVariant.tone}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void copyText(selectedVariant.text, selectedVariant.tone)}
+                    className="btn-secondary text-xs"
+                  >
+                    {copied === selectedVariant.tone ? (
+                      <Check className="h-3.5 w-3.5" />
+                    ) : (
+                      <Copy className="h-3.5 w-3.5" />
+                    )}
+                    Copy
+                  </button>
                 </div>
-                <pre className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-foreground-secondary">
-                  {t.text}
+                <pre className="mt-2 max-h-[28rem] overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-foreground-secondary">
+                  {selectedVariant.text}
                 </pre>
               </div>
-            ))}
+            )}
           </div>
         )}
       </section>
