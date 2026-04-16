@@ -110,7 +110,16 @@ async function tryGreenhouseApi(url: URL): Promise<{
   const location = typeof locRaw === "string" && locRaw.trim() ? locRaw.trim() : null;
   const description =
     typeof data.content === "string"
-      ? load(data.content).text().replace(/\s+/g, " ").trim()
+      ? load(
+          data.content.replace(
+            /<\s*br\s*\/?>|<\s*\/p\s*>|<\s*\/div\s*>|<\s*\/li\s*>/gi,
+            "\n"
+          )
+        )
+          .text()
+          .replace(/[^\S\r\n]+/g, " ")
+          .replace(/\n{3,}/g, "\n\n")
+          .trim()
       : null;
   if (!title || !company) return null;
   return { ok: true, title, company, location, description };
@@ -148,9 +157,21 @@ async function tryLeverApi(url: URL): Promise<{
       : null;
   const description =
     typeof data.descriptionPlain === "string" && data.descriptionPlain.trim()
-      ? data.descriptionPlain.trim()
+      ? data.descriptionPlain
+          .replace(/[^\S\r\n]+/g, " ")
+          .replace(/\n{3,}/g, "\n\n")
+          .trim()
       : typeof data.description === "string"
-        ? load(data.description).text().replace(/\s+/g, " ").trim()
+        ? load(
+            data.description.replace(
+              /<\s*br\s*\/?>|<\s*\/p\s*>|<\s*\/div\s*>|<\s*\/li\s*>/gi,
+              "\n"
+            )
+          )
+            .text()
+            .replace(/[^\S\r\n]+/g, " ")
+            .replace(/\n{3,}/g, "\n\n")
+            .trim()
         : null;
   if (!title || !company) return null;
   return { ok: true, title, company, location, description };
@@ -166,7 +187,15 @@ async function scrapeGenericUrl(url: string) {
   const titleTag = $("title").first().text().trim();
   const metaDescription = $('meta[name="description"]').attr("content")?.trim() ?? "";
   const metaOgTitle = $('meta[property="og:title"]').attr("content")?.trim() ?? "";
-  const bodyText = $("body").text().replace(/\s+/g, " ").trim();
+  const normalizedHtml = html.replace(
+    /<\s*br\s*\/?>|<\s*\/p\s*>|<\s*\/div\s*>|<\s*\/li\s*>/gi,
+    "\n"
+  );
+  const bodyText = load(normalizedHtml)("body")
+    .text()
+    .replace(/[^\S\r\n]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
   return {
     titleTag,
     metaDescription,

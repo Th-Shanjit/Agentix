@@ -75,6 +75,24 @@ function formatRangeLabel(range: NonNullable<JobDTO["ctcRange"]>) {
   return `${prefix}${low}-${high}${periodLabel}`;
 }
 
+function ctcConfidenceLabel(confidence: NonNullable<JobDTO["ctcRange"]>["confidence"]) {
+  if (confidence === "HIGH") return "High Accuracy";
+  if (confidence === "MID") return "Medium Accuracy";
+  return "Low Accuracy";
+}
+
+function ctcConfidenceBadgeClass(
+  confidence: NonNullable<JobDTO["ctcRange"]>["confidence"]
+) {
+  if (confidence === "HIGH") {
+    return "border-emerald-500/30 bg-emerald-500/15 text-emerald-200";
+  }
+  if (confidence === "MID") {
+    return "border-amber-500/30 bg-amber-500/15 text-amber-200";
+  }
+  return "border-red-500/30 bg-red-500/15 text-red-200";
+}
+
 export function JobCard({
   job,
   busy,
@@ -144,9 +162,19 @@ export function JobCard({
                   : "Nil"}
           </p>
           {job.ctcRange && (
-            <p className="text-sm font-medium" style={{ color: "var(--callout-warn-text)" }}>
-              Est. CTC range: {formatRangeLabel(job.ctcRange)}
-            </p>
+            <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
+              <span style={{ color: "var(--callout-warn-text)" }}>
+                Est. CTC range: {formatRangeLabel(job.ctcRange)}
+              </span>
+              <span
+                className={cn(
+                  "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium",
+                  ctcConfidenceBadgeClass(job.ctcRange.confidence)
+                )}
+              >
+                {ctcConfidenceLabel(job.ctcRange.confidence)}
+              </span>
+            </div>
           )}
           <div className="flex flex-wrap gap-2 pt-1">
             <button

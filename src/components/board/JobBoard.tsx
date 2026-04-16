@@ -47,6 +47,8 @@ type CtcErrState =
   | { kind: "gemini"; error: GeminiError }
   | { kind: "save"; message: string };
 
+type SortOption = "recent_desc" | "recent_asc" | "ctc_desc" | "ctc_asc";
+
 function compactAmount(value: number) {
   const n = Math.max(0, Math.round(value));
   if (n >= 100000) {
@@ -85,6 +87,24 @@ function formatRangeLabel(range: NonNullable<JobDTO["ctcRange"]>) {
   return `${prefix}${low}-${high}${periodLabel}`;
 }
 
+function ctcConfidenceLabel(confidence: NonNullable<JobDTO["ctcRange"]>["confidence"]) {
+  if (confidence === "HIGH") return "High Accuracy";
+  if (confidence === "MID") return "Medium Accuracy";
+  return "Low Accuracy";
+}
+
+function ctcConfidenceBadgeClass(
+  confidence: NonNullable<JobDTO["ctcRange"]>["confidence"]
+) {
+  if (confidence === "HIGH") {
+    return "border-emerald-500/30 bg-emerald-500/15 text-emerald-200";
+  }
+  if (confidence === "MID") {
+    return "border-amber-500/30 bg-amber-500/15 text-amber-200";
+  }
+  return "border-red-500/30 bg-red-500/15 text-red-200";
+}
+
 export function JobBoard({
   initialJobs,
   userId,
@@ -118,7 +138,7 @@ export function JobBoard({
   const [bulkEstimating, setBulkEstimating] = useState(false);
   const [jdInput, setJdInput] = useState("");
   const [tab, setTab] = useState<"all" | "applied" | "pending">("all");
-  const [sortBy, setSortBy] = useState<"recent" | "ctc">("recent");
+  const [sortBy, setSortBy] = useState<SortOption>("recent_desc");
   const [searchQuery, setSearchQuery] = useState("");
   const [ruthlessMode, setRuthlessMode] = useState(false);
   const ctcEstimateOptsRef = useRef<{ forceRefresh: boolean }>({
@@ -399,22 +419,47 @@ export function JobBoard({
 
   const sorted = useMemo(() => {
     const copy = [...scoped];
-    if (sortBy === "ctc") {
-      return copy.sort((a, b) => {
-        const va = a.ctcRange?.mid ?? -1;
-        const vb = b.ctcRange?.mid ?? -1;
-        if (vb !== va) return vb - va;
-        return (
-          new Date(b.dateDiscovered).getTime() -
-          new Date(a.dateDiscovered).getTime()
+    switch (sortBy) {
+      case "recent_asc":
+        return copy.sort(
+          (a, b) =>
+            new Date(a.dateDiscovered).getTime() -
+            new Date(b.dateDiscovered).getTime()
         );
-      });
+      case "ctc_desc":
+        return copy.sort((a, b) => {
+          const aHasCtc = a.ctcRange?.mid != null;
+          const bHasCtc = b.ctcRange?.mid != null;
+          if (aHasCtc !== bHasCtc) return aHasCtc ? -1 : 1;
+          const va = a.ctcRange?.mid ?? 0;
+          const vb = b.ctcRange?.mid ?? 0;
+          if (vb !== va) return vb - va;
+          return (
+            new Date(b.dateDiscovered).getTime() -
+            new Date(a.dateDiscovered).getTime()
+          );
+        });
+      case "ctc_asc":
+        return copy.sort((a, b) => {
+          const aHasCtc = a.ctcRange?.mid != null;
+          const bHasCtc = b.ctcRange?.mid != null;
+          if (aHasCtc !== bHasCtc) return aHasCtc ? -1 : 1;
+          const va = a.ctcRange?.mid ?? 0;
+          const vb = b.ctcRange?.mid ?? 0;
+          if (va !== vb) return va - vb;
+          return (
+            new Date(b.dateDiscovered).getTime() -
+            new Date(a.dateDiscovered).getTime()
+          );
+        });
+      case "recent_desc":
+      default:
+        return copy.sort(
+          (a, b) =>
+            new Date(b.dateDiscovered).getTime() -
+            new Date(a.dateDiscovered).getTime()
+        );
     }
-    return copy.sort(
-      (a, b) =>
-        new Date(b.dateDiscovered).getTime() -
-        new Date(a.dateDiscovered).getTime()
-    );
   }, [scoped, sortBy]);
 
   const filtered = useMemo(() => {
@@ -620,9 +665,17 @@ export function JobBoard({
               </div>
             )}
             {ctcRange && (
-              <p className="callout-info">
-                Estimated range metadata: {formatRangeLabel(ctcRange)}
-              </p>
+              <div className="callout-info flex flex-wrap items-center gap-2">
+                <span>Estimated range metadata: {formatRangeLabel(ctcRange)}</span>
+                <span
+                  className={cn(
+                    "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium",
+                    ctcConfidenceBadgeClass(ctcRange.confidence)
+                  )}
+                >
+                  {ctcConfidenceLabel(ctcRange.confidence)}
+                </span>
+              </div>
             )}
           </div>
         )}
@@ -773,13 +826,13 @@ export function JobBoard({
           {tabBtn("Not Applied", "pending", tab, () => setTab("pending"))}
           <select
             value={sortBy}
-            onChange={(e) =>
-              setSortBy(e.target.value === "ctc" ? "ctc" : "recent")
-            }
+            onChange={(e) => setSortBy(e.target.value as SortOption)}
             className="input w-auto min-w-0"
           >
-            <option value="recent">Sort: Recent</option>
-            <option value="ctc">Sort: CTC estimate</option>
+            <option value="recent_desc">Recent (Newest to Oldest)</option>
+            <option value="recent_asc">Recent (Oldest to Newest)</option>
+            <option value="ctc_desc">CTC (Highest to Lowest)</option>
+            <option value="ctc_asc">CTC (Lowest to Highest)</option>
           </select>
           <button
             type="button"
