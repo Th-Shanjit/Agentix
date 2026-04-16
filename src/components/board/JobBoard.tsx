@@ -392,6 +392,36 @@ export function JobBoard({
     [effectiveUserId]
   );
 
+  const handleDeleteJob = useCallback(
+    async (id: string) => {
+      if (id.startsWith("temp-")) return;
+      const target = jobs.find((j) => j.id === id);
+      if (!target) return;
+      const ok = window.confirm(
+        `Remove "${target.role}" at ${target.company} from My jobs?`
+      );
+      if (!ok) return;
+
+      setBusy(id, true);
+      track("job_delete_started");
+      try {
+        const res = await fetch(`/api/jobs/${id}`, { method: "DELETE" });
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        setJobs((list) => list.filter((j) => j.id !== id));
+        toast.success("Job removed from your list.");
+        track("job_delete_succeeded");
+      } catch {
+        toast.error("Could not remove this job.");
+        track("job_delete_failed");
+      } finally {
+        setBusy(id, false);
+      }
+    },
+    [jobs, setBusy]
+  );
+
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -967,6 +997,7 @@ export function JobBoard({
                 onAppliedChange={handleAppliedChange}
                 onEstimateCtc={handleEstimateCtc}
                 onMatchResume={handleMatchResume}
+                onDeleteJob={handleDeleteJob}
               />
             </li>
           ))}

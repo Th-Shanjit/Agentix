@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Briefcase, UserRound } from "lucide-react";
+import { Briefcase, Compass, UserRound } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 const nav = [
   { href: "/board", label: "My jobs", icon: Briefcase },
+  { href: "/discover", label: "Discover", icon: Compass },
   { href: "/profile", label: "Profile", icon: UserRound },
 ];
 

@@ -4,12 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { signOut, useSession } from "next-auth/react";
-import { Briefcase, LogOut, UserRound } from "lucide-react";
+import { Briefcase, Compass, LogOut, UserRound } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { clearActiveSessionCookie } from "@/lib/browser-session";
 
 const nav = [
   { href: "/board", label: "My jobs", icon: Briefcase },
+  { href: "/discover", label: "Discover", icon: Compass },
   { href: "/profile", label: "Profile", icon: UserRound },
 ];
 

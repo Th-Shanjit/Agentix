@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Sparkles,
   Target,
+  Trash2,
 } from "lucide-react";
 import { IOSToggle } from "@/components/ui/IOSToggle";
 import type { JobDTO } from "@/lib/jobs";
@@ -21,6 +22,7 @@ type JobCardProps = {
   onAppliedChange: (id: string, applied: boolean) => void;
   onEstimateCtc: (job: JobDTO) => void;
   onMatchResume: (job: JobDTO) => void;
+  onDeleteJob: (id: string) => void;
 };
 
 function formatDiscovered(iso: string) {
@@ -101,6 +103,7 @@ export function JobCard({
   onAppliedChange,
   onEstimateCtc,
   onMatchResume,
+  onDeleteJob,
 }: JobCardProps) {
   const syncPending = Boolean(pendingSync);
   const aiActionsDisabled = aiBusy || syncPending;
@@ -214,6 +217,15 @@ export function JobCard({
               Open posting
               <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.75} />
             </a>
+            <button
+              type="button"
+              disabled={busy || syncPending}
+              onClick={() => onDeleteJob(job.id)}
+              className="btn-secondary border-red-500/30 bg-red-500/10 text-xs text-red-200 hover:bg-red-500/20"
+            >
+              <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Delete
+            </button>
           </div>
         </div>
 
