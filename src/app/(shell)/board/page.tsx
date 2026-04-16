@@ -14,15 +14,36 @@ export default async function BoardPage({
   const userId = session?.user?.id;
   const shouldRefresh = searchParams?.refresh === "1";
 
-  const rows = userId
-    ? await prisma.userJob.findMany({
-        where: { userId, jobListing: { archivedAt: null } },
-        include: { jobListing: true },
-        orderBy: { jobListing: { postedAt: "desc" } },
-      })
-    : [];
+  const [rows, user] = userId
+    ? await Promise.all([
+        prisma.userJob.findMany({
+          where: { userId, jobListing: { archivedAt: null } },
+          include: { jobListing: true },
+          orderBy: { jobListing: { postedAt: "desc" } },
+        }),
+        prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            resumeText: true,
+            yearsExperience: true,
+            preferredCountries: true,
+            preferredRoles: true,
+            searchRemotePreference: true,
+          },
+        }),
+      ])
+    : [[], null];
 
   const initialJobs = rows.map(toJobDTOFromJoin);
+  const hasResume = Boolean(user?.resumeText?.trim());
+  const hasPrefs =
+    (typeof user?.yearsExperience === "number" &&
+      Number.isFinite(user.yearsExperience)) ||
+    (Array.isArray(user?.preferredCountries) &&
+      user.preferredCountries.some((x) => typeof x === "string" && x.trim())) ||
+    (Array.isArray(user?.preferredRoles) &&
+      user.preferredRoles.some((x) => typeof x === "string" && x.trim())) ||
+    Boolean(user?.searchRemotePreference);
 
   return (
     <div className="space-y-6">
@@ -38,6 +59,11 @@ export default async function BoardPage({
         initialJobs={initialJobs}
         userId={userId ?? ""}
         autoRefreshOnMount={shouldRefresh}
+        setup={{
+          hasResume,
+          hasPrefs,
+          hasJobs: initialJobs.length > 0,
+        }}
       />
     </div>
   );

@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { GlassBackground } from "@/components/layout/GlassBackground";
 import { setActiveSessionCookie } from "@/lib/browser-session";
+import { track } from "@vercel/analytics";
 
 type LoginClientProps = {
   defaultCallbackUrl: string;
@@ -17,10 +18,12 @@ function LoginForm({ defaultCallbackUrl }: LoginClientProps) {
   const callbackUrl =
     callbackRaw && callbackRaw.startsWith("/") ? callbackRaw : defaultCallbackUrl;
   const authError = searchParams.get("error");
+    const reason = searchParams.get("reason");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+    const [continuing, setContinuing] = useState(false);
 
   async function handlePasswordSignIn(e: React.FormEvent) {
     e.preventDefault();
@@ -39,6 +42,7 @@ function LoginForm({ defaultCallbackUrl }: LoginClientProps) {
       }
       if (res?.ok) {
         setActiveSessionCookie();
+        track("auth_login_success", { method: "credentials" });
         window.location.href = callbackUrl;
         return;
       }
@@ -65,6 +69,31 @@ function LoginForm({ defaultCallbackUrl }: LoginClientProps) {
         </div>
 
         <div className="card p-6">
+          {reason === "browser_session_missing" && (
+            <div className="callout-warn mb-4 text-sm">
+              <p className="font-medium text-foreground">Session sync needed</p>
+              <p className="mt-1 leading-relaxed text-foreground-secondary">
+                You’re signed in, but this browser needs a quick session marker
+                to access protected pages.
+              </p>
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  disabled={continuing}
+                  onClick={() => {
+                    if (continuing) return;
+                    setContinuing(true);
+                    setActiveSessionCookie();
+                    track("auth_cookie_continue", { reason });
+                    window.location.href = callbackUrl;
+                  }}
+                  className="btn-secondary text-xs"
+                >
+                  {continuing ? "Continuing…" : "Continue"}
+                </button>
+              </div>
+            </div>
+          )}
           <form
             onSubmit={(e) => void handlePasswordSignIn(e)}
             className="space-y-4"

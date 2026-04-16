@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { updateSearchPreferences } from "@/actions/user";
 import type { RemotePreference } from "@prisma/client";
+import { track } from "@vercel/analytics";
 
 type ProfileSearchPrefsProps = {
   initialYears: number | null;
@@ -52,6 +53,13 @@ export function ProfileSearchPrefs({
       });
       if (!r.ok) throw new Error(r.error);
       toast.success("Saved.");
+      track("profile_prefs_saved", {
+        hasYears: !Number.isNaN(y),
+        hasCountries: Boolean(countries.trim()),
+        hasRoles: Boolean(roles.trim()),
+        remote,
+        alertEmailsEnabled,
+      });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Save failed.");
     } finally {

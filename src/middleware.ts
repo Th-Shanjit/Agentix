@@ -9,7 +9,8 @@ export default auth((req) => {
   const { pathname } = req.nextUrl;
   const hasBrowserSession =
     req.cookies.get("agentix_active_session")?.value === "1";
-  const isAuthed = Boolean(req.auth) && hasBrowserSession;
+  const hasAuthSession = Boolean(req.auth);
+  const isAuthed = hasAuthSession && hasBrowserSession;
 
   if (pathname.startsWith("/api/jobs")) {
     if (isAuthed) return NextResponse.next();
@@ -25,6 +26,9 @@ export default auth((req) => {
     if (isAuthed) return NextResponse.next();
     const loginUrl = new URL("/login", req.nextUrl.origin);
     loginUrl.searchParams.set("callbackUrl", pathname);
+    if (hasAuthSession && !hasBrowserSession) {
+      loginUrl.searchParams.set("reason", "browser_session_missing");
+    }
     return NextResponse.redirect(loginUrl);
   }
 

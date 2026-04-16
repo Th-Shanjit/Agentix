@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Briefcase, Plus, RefreshCw, Search } from "lucide-react";
 import { toast } from "sonner";
+import { track } from "@vercel/analytics";
 import { addManualJob, toggleJobAppliedStatus } from "@/actions/jobs";
 import {
   batchEstimateCTC,
@@ -20,6 +21,7 @@ import { JobsImportUpload } from "@/components/profile/JobsImportUpload";
 import { BulkUrlImporter } from "@/components/board/BulkUrlImporter";
 import { GlassModal } from "@/components/ui/GlassModal";
 import { RadialScore } from "./RadialScore";
+import { SetupChecklistCard } from "@/components/board/SetupChecklistCard";
 import type { JobDTO } from "@/lib/jobs";
 import { normalizeJobFromApi } from "@/lib/jobs";
 import { cn } from "@/lib/cn";
@@ -29,6 +31,7 @@ type JobBoardProps = {
   initialJobs: JobDTO[];
   userId: string;
   autoRefreshOnMount?: boolean;
+  setup?: { hasResume: boolean; hasPrefs: boolean; hasJobs: boolean };
 };
 
 type AiOpen =
@@ -109,6 +112,7 @@ export function JobBoard({
   initialJobs,
   userId,
   autoRefreshOnMount = false,
+  setup,
 }: JobBoardProps) {
   const { data: session, status: sessionStatus } = useSession();
   const effectiveUserId = session?.user?.id ?? userId ?? "";
@@ -175,6 +179,7 @@ export function JobBoard({
 
       setBusy(id, true);
       try {
+        track("job_applied_toggle", { applied });
         const result = await toggleJobAppliedStatus(id, applied);
         if (!result.ok) {
           throw new Error(result.error);
@@ -182,12 +187,14 @@ export function JobBoard({
         setJobs((list) =>
           list.map((j) => (j.id === id ? { ...j, ...result.job } : j))
         );
+        track("job_applied_toggle_success", { applied });
       } catch {
         const revert = previousApplied;
         setJobs((list) =>
           list.map((j) => (j.id === id ? { ...j, applied: revert } : j))
         );
         toast.error("Could not update applied status.");
+        track("job_applied_toggle_failed", { applied });
       } finally {
         setBusy(id, false);
       }
@@ -228,10 +235,12 @@ export function JobBoard({
       ctcEstimateOptsRef.current = { forceRefresh };
       setAi({ mode: "ctc", job });
       setCtcErr(null);
+      track("ai_ctc_started", { forceRefresh });
       if (!forceRefresh && job.ctc?.trim() && job.ctcRange) {
         setCtcLoading(false);
         setCtcText(job.ctc);
         setCtcRange(job.ctcRange);
+        track("ai_ctc_cache_hit");
         return;
       }
       setCtcLoading(true);
@@ -243,6 +252,7 @@ export function JobBoard({
       if (!r.ok) {
         setCtcLoading(false);
         setCtcErr({ kind: "gemini", error: r.error });
+        track("ai_ctc_failed", { code: r.error.code });
         return;
       }
       if (!r.range) {
@@ -251,6 +261,7 @@ export function JobBoard({
           kind: "save",
           message: "Estimate returned without a valid range.",
         });
+        track("ai_ctc_failed", { code: "range_missing" });
         return;
       }
       try {
@@ -258,11 +269,13 @@ export function JobBoard({
         await persistCtcEstimate(job.id, r.text, r.range);
         setCtcText(r.text);
         setCtcRange(r.range);
+        track("ai_ctc_succeeded", { confidence: r.range.confidence ?? "LOW" });
       } catch {
         setCtcErr({
           kind: "save",
           message: "Could not persist CTC info for this job.",
         });
+        track("ai_ctc_failed", { code: "persist_failed" });
       } finally {
         setSaveCtcBusy(false);
         setCtcLoading(false);
@@ -288,10 +301,12 @@ export function JobBoard({
       setAi({ mode: "match", job });
       setMatchData(null);
       setMatchErr(null);
+      track("ai_match_started");
 
       const res = await fetch("/api/user/resume");
       if (!res.ok) {
         setMatchErr({ kind: "resume_fetch" });
+        track("ai_match_failed", { code: "resume_fetch" });
         return;
       }
       const payload: unknown = await res.json();
@@ -304,6 +319,7 @@ export function JobBoard({
           : null;
       if (!text?.trim()) {
         setMatchErr({ kind: "no_resume" });
+        track("ai_match_failed", { code: "no_resume" });
         return;
       }
 
@@ -315,8 +331,13 @@ export function JobBoard({
         job.description ?? jdInput
       );
       setMatchLoading(false);
-      if (r.ok) setMatchData(r.data);
-      else setMatchErr({ kind: "gemini", error: r.error });
+      if (r.ok) {
+        setMatchData(r.data);
+        track("ai_match_succeeded", { matchPercentage: r.data.matchPercentage });
+      } else {
+        setMatchErr({ kind: "gemini", error: r.error });
+        track("ai_match_failed", { code: r.error.code });
+      }
     },
     [jdInput]
   );
@@ -492,7 +513,7 @@ export function JobBoard({
     (j) => !j.id.startsWith("temp-") && !j.notYetListed
   );
 
-  const aiBusy = ctcLoading || matchLoading || saveCtcBusy || bulkEstimating;
+  const modalAiBusy = ctcLoading || matchLoading || saveCtcBusy;
 
   const estimateAllVisibleCtc = useCallback(async () => {
     if (bulkEligible.length === 0) {
@@ -500,6 +521,7 @@ export function JobBoard({
       return;
     }
     setBulkEstimating(true);
+    track("ai_ctc_bulk_started", { count: bulkEligible.length });
     try {
       const inputs = bulkEligible.map((j) => ({
         id: j.id,
@@ -511,6 +533,7 @@ export function JobBoard({
       const batchResult = await batchEstimateCTC(inputs, { inrOnly: true });
       if (!batchResult.ok) {
         toast.error(batchResult.error.message);
+        track("ai_ctc_bulk_failed", { code: batchResult.error.code });
         return;
       }
 
@@ -586,6 +609,7 @@ export function JobBoard({
       toast.success(
         `CTC estimated for ${success} listing${success === 1 ? "" : "s"}.`
       );
+      track("ai_ctc_bulk_completed", { success, failed });
       if (failed > 0) {
         toast.message(
           `${failed} listing${failed === 1 ? "" : "s"} could not be estimated.`
@@ -618,6 +642,13 @@ export function JobBoard({
 
   return (
     <div className="space-y-4">
+      {setup && (
+        <SetupChecklistCard
+          hasResume={setup.hasResume}
+          hasPrefs={setup.hasPrefs}
+          hasJobs={setup.hasJobs}
+        />
+      )}
       {/* ── CTC Modal ──────────────────────────────────────────── */}
       <GlassModal
         open={ai?.mode === "ctc"}
@@ -674,6 +705,9 @@ export function JobBoard({
                   )}
                 >
                   {ctcConfidenceLabel(ctcRange.confidence)}
+                </span>
+                <span className="text-xs text-foreground-muted">
+                  Confidence reflects how reliable the estimate is.
                 </span>
               </div>
             )}
@@ -837,7 +871,7 @@ export function JobBoard({
           <button
             type="button"
             onClick={() => void estimateAllVisibleCtc()}
-            disabled={aiBusy || bulkEligible.length === 0}
+            disabled={bulkEstimating || bulkEligible.length === 0}
             className="btn-primary text-sm"
           >
             {bulkEstimating ? "Estimating all..." : "Estimate all CTC"}
@@ -925,7 +959,10 @@ export function JobBoard({
               <JobCard
                 job={job}
                 busy={Boolean(busyIds[job.id])}
-                aiBusy={aiBusy}
+                aiBusy={
+                  bulkEstimating ||
+                  (ai?.job.id === job.id && modalAiBusy)
+                }
                 pendingSync={job.id.startsWith("temp-")}
                 onAppliedChange={handleAppliedChange}
                 onEstimateCtc={handleEstimateCtc}

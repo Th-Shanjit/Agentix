@@ -103,7 +103,7 @@ export function JobCard({
   onMatchResume,
 }: JobCardProps) {
   const syncPending = Boolean(pendingSync);
-  const actionsDisabled = aiBusy || syncPending;
+  const aiActionsDisabled = aiBusy || syncPending;
   const hasRelevance =
     typeof job.relevanceScore === "number" &&
     Number.isFinite(job.relevanceScore);
@@ -179,7 +179,7 @@ export function JobCard({
           <div className="flex flex-wrap gap-2 pt-1">
             <button
               type="button"
-              disabled={actionsDisabled}
+              disabled={aiActionsDisabled}
               onClick={() => onEstimateCtc(job)}
               className="btn-secondary text-xs"
             >
@@ -191,7 +191,7 @@ export function JobCard({
             </button>
             <button
               type="button"
-              disabled={actionsDisabled}
+              disabled={aiActionsDisabled}
               onClick={() => onMatchResume(job)}
               className="btn-secondary text-xs"
             >

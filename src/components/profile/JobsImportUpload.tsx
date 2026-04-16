@@ -9,6 +9,8 @@ import {
   type ImportMappingAudit,
 } from "@/actions/gemini-job-features";
 import { cn } from "@/lib/cn";
+import { track } from "@vercel/analytics";
+import { useRef } from "react";
 
 /** Keeps each Server Action POST under platform body limits (long descriptions dominate size). */
 const IMPORT_JOBS_CHUNK_SIZE = 45;
@@ -24,6 +26,16 @@ const IMPORT_MAX_DESCRIPTION_CHARS = 12_000;
 
 /** Parallel Gemini map / import calls per wave — stay under API rate limits. */
 const MAP_IMPORT_CONCURRENCY = 4;
+
+type ImportProgress =
+  | null
+  | {
+      stage: "mapping" | "importing";
+      wave: number;
+      wavesTotal: number;
+      chunksDone: number;
+      chunksTotal: number;
+    };
 
 type ParseResult = {
   rows: UploadJobInput[];
@@ -188,7 +200,13 @@ function truncateJobsForImportPayload(jobs: UploadJobInput[]): UploadJobInput[] 
   });
 }
 
-async function mapImportRowsWithGeminiInChunks(genericRows: GenericRow[]): Promise<
+async function mapImportRowsWithGeminiInChunks(
+  genericRows: GenericRow[],
+  opts?: {
+    cancelled?: () => boolean;
+    onProgress?: (p: NonNullable<ImportProgress>) => void;
+  }
+): Promise<
   | { ok: true; rows: UploadJobInput[]; audit: ImportMappingAudit[] }
   | { ok: false; message: string }
 > {
@@ -201,8 +219,18 @@ async function mapImportRowsWithGeminiInChunks(genericRows: GenericRow[]): Promi
   const totalBatches = Math.ceil(totalChunks / MAP_IMPORT_CONCURRENCY);
 
   for (let batchStart = 0; batchStart < totalChunks; batchStart += MAP_IMPORT_CONCURRENCY) {
+    if (opts?.cancelled?.()) {
+      return { ok: false, message: "Cancelled." };
+    }
     const batchEnd = Math.min(batchStart + MAP_IMPORT_CONCURRENCY, totalChunks);
     const batchNum = Math.floor(batchStart / MAP_IMPORT_CONCURRENCY) + 1;
+    opts?.onProgress?.({
+      stage: "mapping",
+      wave: batchNum,
+      wavesTotal: totalBatches,
+      chunksDone: batchStart,
+      chunksTotal: totalChunks,
+    });
     if (totalChunks > 1) {
       toast.message(
         `Mapping schema: wave ${batchNum} of ${totalBatches} (chunks ${batchStart + 1}–${batchEnd} of ${totalChunks}, up to ${MAP_IMPORT_CONCURRENCY} in parallel)…`
@@ -285,12 +313,16 @@ export function JobsImportUpload({
   const [errors, setErrors] = useState<string[]>([]);
   const [mappingAudit, setMappingAudit] = useState<ImportMappingAudit[]>([]);
   const [minRelevance, setMinRelevance] = useState("60");
+  const [progress, setProgress] = useState<ImportProgress>(null);
+  const cancelAfterWaveRef = useRef(false);
 
   const canImport = rows.length > 0 && !busy;
   const sample = useMemo(() => rows.slice(0, 3), [rows]);
 
   async function onPick(file: File) {
     setBusy(true);
+    setProgress(null);
+    cancelAfterWaveRef.current = false;
     try {
       const text = await readAsText(file);
       const isJson = file.name.toLowerCase().endsWith(".json");
@@ -335,7 +367,11 @@ export function JobsImportUpload({
           : parseCsvToGenericRows(text).rows;
 
         if (genericRows.length > 0) {
-          const aiMap = await mapImportRowsWithGeminiInChunks(genericRows);
+          track("import_mapping_started", { rows: genericRows.length });
+          const aiMap = await mapImportRowsWithGeminiInChunks(genericRows, {
+            cancelled: () => cancelAfterWaveRef.current,
+            onProgress: setProgress,
+          });
           if (aiMap.ok) {
             finalRows = aiMap.rows;
             audit = aiMap.audit;
@@ -343,6 +379,10 @@ export function JobsImportUpload({
               toast.message("Used AI schema mapping to normalize this file.");
             }
           } else {
+            if (aiMap.message === "Cancelled.") {
+              track("import_mapping_cancelled");
+              toast.message("Mapping cancelled.");
+            }
             finalErrors.push(aiMap.message);
           }
         }
@@ -351,6 +391,7 @@ export function JobsImportUpload({
       setRows(finalRows);
       setErrors(finalErrors);
       setMappingAudit(audit);
+      setProgress(null);
       if (finalRows.length > 0) {
         toast.success(`Parsed ${finalRows.length} jobs from ${file.name}.`);
       } else {
@@ -368,6 +409,8 @@ export function JobsImportUpload({
 
   async function onImport() {
     setBusy(true);
+    setProgress(null);
+    cancelAfterWaveRef.current = false;
     try {
       const threshold = Number.parseInt(minRelevance, 10);
       const minRel = Number.isNaN(threshold) ? 60 : threshold;
@@ -380,9 +423,22 @@ export function JobsImportUpload({
       let aiMatched = 0;
       let skippedInvalid = 0;
       const importBatches = Math.ceil(chunks.length / MAP_IMPORT_CONCURRENCY);
+      track("import_upload_started", { chunks: chunks.length, rows: rows.length });
       for (let batchStart = 0; batchStart < chunks.length; batchStart += MAP_IMPORT_CONCURRENCY) {
+        if (cancelAfterWaveRef.current) {
+          track("import_upload_cancelled", { addedCount, aiMatched, aiConsidered });
+          toast.message("Import cancelled.");
+          return;
+        }
         const batchEnd = Math.min(batchStart + MAP_IMPORT_CONCURRENCY, chunks.length);
         const waveNum = Math.floor(batchStart / MAP_IMPORT_CONCURRENCY) + 1;
+        setProgress({
+          stage: "importing",
+          wave: waveNum,
+          wavesTotal: importBatches,
+          chunksDone: batchStart,
+          chunksTotal: chunks.length,
+        });
         if (chunks.length > 1) {
           toast.message(
             `Importing wave ${waveNum} of ${importBatches} (chunks ${batchStart + 1}–${batchEnd} of ${chunks.length}, up to ${MAP_IMPORT_CONCURRENCY} in parallel)…`
@@ -410,17 +466,25 @@ export function JobsImportUpload({
       toast.success(
         `Imported ${addedCount} jobs. AI matched ${aiMatched}/${aiConsidered}.`
       );
+      track("import_upload_completed", {
+        addedCount,
+        aiMatched,
+        aiConsidered,
+        skippedInvalid,
+      });
       if (skippedInvalid > 0) {
         toast.message(`${skippedInvalid} rows were skipped as invalid.`);
       }
       setRows([]);
       setErrors([]);
       setMappingAudit([]);
+      setProgress(null);
       if (onImported) {
         await onImported();
       }
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   }
 
@@ -468,7 +532,32 @@ export function JobsImportUpload({
         >
           {busy ? "Processing..." : `Import ${rows.length || ""}`.trim()}
         </button>
+        {busy && (
+          <button
+            type="button"
+            className="btn-secondary w-full sm:w-auto"
+            onClick={() => {
+              cancelAfterWaveRef.current = true;
+              toast.message("Will cancel after this wave finishes.");
+            }}
+          >
+            Cancel after this wave
+          </button>
+        )}
       </div>
+
+      {progress && (
+        <div className="callout-info mt-4 text-xs">
+          <p className="font-medium text-foreground">
+            {progress.stage === "mapping" ? "Mapping" : "Importing"} in progress
+          </p>
+          <p className="mt-1 text-foreground-secondary">
+            Wave {progress.wave} of {progress.wavesTotal} · chunks{" "}
+            {progress.chunksDone + 1}–{Math.min(progress.chunksDone + MAP_IMPORT_CONCURRENCY, progress.chunksTotal)} of{" "}
+            {progress.chunksTotal}
+          </p>
+        </div>
+      )}
 
       {sample.length > 0 && (
         <div className="card-inset mt-4 p-3 text-xs text-foreground-secondary">

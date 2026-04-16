@@ -16,6 +16,7 @@ import {
   getStoredResumeText,
 } from "@/lib/resume-storage";
 import { cn } from "@/lib/cn";
+import { track } from "@vercel/analytics";
 
 function wordCount(text: string) {
   return text.trim() ? text.trim().split(/\s+/).length : 0;
@@ -93,6 +94,9 @@ export function ResumeUpload({
       }
       setText(extracted);
       toast.success("Resume saved to your account.");
+      track("profile_resume_saved", {
+        chars: extracted.length,
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to read PDF.");
     } finally {
@@ -133,6 +137,7 @@ export function ResumeUpload({
       setText("");
       clearStoredResumeText();
       toast.success("Resume cleared.");
+      track("profile_resume_cleared");
     } finally {
       setBusy(false);
     }
@@ -152,6 +157,7 @@ export function ResumeUpload({
       toast.success(
         trimmed ? "Career highlights saved." : "Career highlights cleared."
       );
+      track("profile_brag_sheet_saved", { chars: trimmed.length });
     } finally {
       setSavingBragSheet(false);
     }
