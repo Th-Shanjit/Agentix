@@ -23,21 +23,24 @@ export async function extractPdfText(file: File): Promise<string> {
   const loadingTask = pdfjs.getDocument({ data: new Uint8Array(data) });
   const pdf = await loadingTask.promise;
 
-  const parts: string[] = [];
-  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-    const page = await pdf.getPage(pageNum);
-    const textContent = await page.getTextContent();
-    const line = textContent.items
-      .map((item) => {
-        if (item && typeof item === "object" && "str" in item) {
-          return String((item as { str: unknown }).str ?? "");
-        }
-        return "";
-      })
-      .filter(Boolean)
-      .join(" ");
-    if (line) parts.push(line);
-  }
+  const pageNumbers = Array.from({ length: pdf.numPages }, (_, i) => i + 1);
+  const partsRaw = await Promise.all(
+    pageNumbers.map(async (pageNum) => {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const line = textContent.items
+        .map((item) => {
+          if (item && typeof item === "object" && "str" in item) {
+            return String((item as { str: unknown }).str ?? "");
+          }
+          return "";
+        })
+        .filter(Boolean)
+        .join(" ");
+      return line;
+    })
+  );
+  const parts = partsRaw.filter(Boolean);
 
   return parts.join("\n\n").replace(/\s+\n/g, "\n").trim();
 }

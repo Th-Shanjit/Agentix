@@ -540,16 +540,13 @@ export async function enrichJobDetailGemini(
       ? desc.slice(0, MAX_DESC) + "…"
       : desc ?? "";
 
-  const prompt = `"You are evaluating a candidate. You are provided with a standard ATS Resume AND a 'Brag Sheet' (a raw list of proof points, metrics, and career highlights).
-CRITICAL RULE: Treat the Brag Sheet as absolute truth. When writing resume variants or interview stories, prioritize injecting the hard numbers and specific project names found in the Brag Sheet over the generic text found in the standard resume."
+  const researchPrompt = `You are a web-grounded research assistant for a job seeker.
+Actively use live web search before answering. Ground outputs in recent information from multiple sources.
 
-You help a job seeker and you can use live web search.
-Actively search the web before answering. Ground your outputs in current information from multiple sources.
-Specifically look for:
-- company's recent news (last 6-12 months),
-- company ratings and review trends from Glassdoor/AmbitionBox or similar,
-- live salary benchmarks for this role/location from levels.fyi and comparable salary sites.
-If evidence is sparse, be explicit in uncertainty and use conservative ranges.
+Focus ONLY on:
+- company ratings/review trends (Glassdoor, AmbitionBox, similar),
+- public forum/community sentiment,
+- compensation benchmarks for this role/location.
 
 Job: ${job.title} at ${job.company}
 Location: ${job.location ?? "unknown"}
@@ -559,9 +556,31 @@ Description excerpt:
 ${jd}
 """
 
+Respond with one object containing EXACTLY:
+{
+  "ctcBands": { "low": number, "mid": number, "high": number, "currency": string, "credibilityNote": string, "confidence": "LOW" | "MID" | "HIGH" },
+  "ratingsWeb": { "glassdoorSummary": string, "ambitionBoxSummary": string, "disclaimer": string },
+  "forumSentiment": { "summary": string, "label": string, "disclaimer": string }
+}
+
+Set "confidence" as estimate reliability:
+- HIGH: strong verified company+role data
+- MID: mostly industry averages
+- LOW: sparse/weak evidence`;
+
+  const generationPrompt = `"You are evaluating a candidate. You are provided with a standard ATS Resume AND a 'Brag Sheet' (a raw list of proof points, metrics, and career highlights).
+CRITICAL RULE: Treat the Brag Sheet as absolute truth. When writing interview stories and recommendations, prioritize hard numbers and specific project names found in the Brag Sheet over generic resume phrasing."
+
+Job: ${job.title} at ${job.company}
+Location: ${job.location ?? "unknown"}
+Description excerpt:
+"""
+${jd}
+"""
+
 Candidate résumé (may be empty):
 """
-${resume || "(none — still give CTC band estimate and skip deep resume grade)"}
+${resume || "(none — set resumeGrade to 0 and keep strengths/weaknesses concise)"}
 """
 
 Career highlights and proof points (hard stats, wins, outcomes):
@@ -569,32 +588,43 @@ Career highlights and proof points (hard stats, wins, outcomes):
 ${bragSheet || "(none provided)"}
 """
 
-Use the highlights as concrete evidence when evaluating fit and crafting tailored recommendations.
+Respond with one object containing EXACTLY:
+{
+  "resumeGrade": number,
+  "resumeStrengths": string[],
+  "resumeWeaknesses": string[],
+  "areasToFix": string[],
+  "interviewStories": [
+    { "title": string, "situation": string, "task": string, "action": string, "result": string }
+  ],
+  "negotiationStrategy": [
+    { "scenario": string, "script": string }
+  ]
+}
 
-Respond with one object containing:
-- "ctcBands": { "low": number, "mid": number, "high": number, "currency": string (e.g. USD or INR), "credibilityNote": string (1-2 sentences on uncertainty), "confidence": "LOW" | "MID" | "HIGH" }
-  Set "confidence" to "HIGH" if you have strong verified data for this exact company/role, "MID" if based mainly on industry averages, or "LOW" if guessing from sparse data. (This reflects estimate reliability, not the numeric spread.)
-- "ratingsWeb": { "glassdoorSummary": string (include useful rating/context signals found online), "ambitionBoxSummary": string, "disclaimer": string }
-- "forumSentiment": { "summary": string (1-3 sentences), "label": string (e.g. Mixed), "disclaimer": string }
-- "resumeGrade": number 0-100 (0 if no résumé)
-- "resumeStrengths": string[]
-- "resumeWeaknesses": string[]
-- "areasToFix": string[] (actionable bullets)
-- "interviewStories": exactly 5 objects, each:
-  { "title": string, "situation": string, "task": string, "action": string, "result": string }
-  Use STAR: situation, task, action, result; ground stories in resume/highlights and this role.
-- "negotiationStrategy": exactly 3 objects, each:
-  { "scenario": string, "script": string }
-  Tactical salary/offer negotiation scripts or emails, including pushback and estimated CTC context.
-
-For "interviewStories", generate 5 behavioral stories tailored to this job description. Each story follows STAR (reflection can fold into result text if needed).`;
+Rules:
+- resumeGrade must be 0-100 (0 if no resume text).
+- interviewStories: exactly 5 STAR stories tailored to this job.
+- negotiationStrategy: exactly 3 tactical scripts.`;
 
   try {
-    const model = getGeminiModel(true);
-    const result = await model.generateContent(geminiJsonRequest(prompt));
-    const raw = result.response.text().trim();
-    const o = extractJsonObject(raw);
-    if (!o || !o.ctcBands || !o.ratingsWeb || !o.forumSentiment) {
+    const researchModel = getGeminiModel(true);
+    const generationModel = getGeminiModel(false);
+    const [researchResult, generationResult] = await Promise.all([
+      researchModel.generateContent(geminiJsonRequest(researchPrompt)),
+      generationModel.generateContent(geminiJsonRequest(generationPrompt)),
+    ]);
+    const researchRaw = researchResult.response.text().trim();
+    const generationRaw = generationResult.response.text().trim();
+    const researchObj = extractJsonObject(researchRaw);
+    const generationObj = extractJsonObject(generationRaw);
+    if (
+      !researchObj ||
+      !researchObj.ctcBands ||
+      !researchObj.ratingsWeb ||
+      !researchObj.forumSentiment ||
+      !generationObj
+    ) {
       return {
         ok: false,
         error: geminiError(
@@ -605,9 +635,9 @@ For "interviewStories", generate 5 behavioral stories tailored to this job descr
       };
     }
 
-    const bands = o.ctcBands as Record<string, unknown>;
-    const rw = o.ratingsWeb as Record<string, unknown>;
-    const fs = o.forumSentiment as Record<string, unknown>;
+    const bands = researchObj.ctcBands as Record<string, unknown>;
+    const rw = researchObj.ratingsWeb as Record<string, unknown>;
+    const fs = researchObj.forumSentiment as Record<string, unknown>;
 
     const sal = (x: unknown) =>
       typeof x === "number" && Number.isFinite(x) ? Math.max(0, x) : 0;
@@ -642,18 +672,18 @@ For "interviewStories", generate 5 behavioral stories tailored to this job descr
             ? fs.disclaimer
             : "Not verified.",
       },
-      resumeGrade: clamp(o.resumeGrade, 0, 100),
-      resumeStrengths: Array.isArray(o.resumeStrengths)
-        ? o.resumeStrengths.filter((x): x is string => typeof x === "string")
+      resumeGrade: clamp(generationObj.resumeGrade, 0, 100),
+      resumeStrengths: Array.isArray(generationObj.resumeStrengths)
+        ? generationObj.resumeStrengths.filter((x): x is string => typeof x === "string")
         : [],
-      resumeWeaknesses: Array.isArray(o.resumeWeaknesses)
-        ? o.resumeWeaknesses.filter((x): x is string => typeof x === "string")
+      resumeWeaknesses: Array.isArray(generationObj.resumeWeaknesses)
+        ? generationObj.resumeWeaknesses.filter((x): x is string => typeof x === "string")
         : [],
-      areasToFix: Array.isArray(o.areasToFix)
-        ? o.areasToFix.filter((x): x is string => typeof x === "string")
+      areasToFix: Array.isArray(generationObj.areasToFix)
+        ? generationObj.areasToFix.filter((x): x is string => typeof x === "string")
         : [],
-      interviewStories: Array.isArray(o.interviewStories)
-        ? o.interviewStories
+      interviewStories: Array.isArray(generationObj.interviewStories)
+        ? generationObj.interviewStories
             .filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === "object")
             .map((x) => ({
               title: typeof x.title === "string" ? x.title : "",
@@ -672,8 +702,8 @@ For "interviewStories", generate 5 behavioral stories tailored to this job descr
             )
             .slice(0, 5)
         : [],
-      negotiationStrategy: Array.isArray(o.negotiationStrategy)
-        ? o.negotiationStrategy
+      negotiationStrategy: Array.isArray(generationObj.negotiationStrategy)
+        ? generationObj.negotiationStrategy
             .filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === "object")
             .map((x) => ({
               scenario: typeof x.scenario === "string" ? x.scenario : "",

@@ -79,7 +79,7 @@ export type BatchEstimateCTCResult =
   | { ok: false; error: GeminiError };
 
 const BATCH_ESTIMATE_CTC_ROLES = 20;
-const BATCH_ESTIMATE_CTC_CONCURRENCY = 3;
+const BATCH_ESTIMATE_CTC_CONCURRENCY = 2;
 
 export type MatchResumeATSResult =
   | { ok: true; data: AtsMatchResult }
